@@ -3,19 +3,27 @@
 SocketServer server; //making server object
 
 void *listener(void *rawPointerToArguments){ //making listener function for communicate with clients
-    netServerAttribures *pointerToArgument = (netServerAttribures*)rawPointerToArguments; //decoding arguments for this listener.
-    std::cout <<"read:\t"<< pointerToArgument->socketServer->read() << std::endl; //reading incoming message and print it
+    throwNetAttr *pointerToArgument = (throwNetAttr*)rawPointerToArguments; //decoding arguments for this listener.
+    sleep(1);
+    pointerToArgument->ptsd->sockPtr->setBuffer(server.buffer);
+    std::cout <<"read:\t"<< pointerToArgument->ptsd->sockPtr->read(pointerToArgument->connID) << std::endl; //reading incoming message and print it
     while(1){ //endless loop
-            pointerToArgument->socketServer->send("Hello!", pointerToArgument->connectionID); //sending "hello" message
-            pointerToArgument->socketServer->read(pointerToArgument->connectionID); //reading from current connection
-            std::cout<<pointerToArgument->socketServer->buffer<<"\n"; //print message from buffer
+        pointerToArgument->ptsd->socketServer->send("Hello!", pointerToArgument->connID); //sending "hello" message
+        pointerToArgument->ptsd->socketServer->read(pointerToArgument->connID); //reading from current connection
+        std::cout<<pointerToArgument->ptsd->socketServer->buffer<<"\n"; //print message from buffer
     }
 }
 
 char readingBuffer[1024]; //reading buffer
 
+// NetworkListener networkListener;
+
 int main(){
     try{ //try to start server
+        // networkListener.SetListener(DEFAULT_LISTENER,*[](void *arg){ // this is set default requests listener to lambda-function. You also can you pointer to func.
+        //     networkListener.read(arg); // read data from current connection
+        //     networkListener.send(arg, "hello!"); // send data to current connection
+        // });
         std::cout<<server.setBitrade(1024)<<std::endl; //set a bitrade, print current bitrade (shoud be 1024)
         server.setBuffer(readingBuffer); //setting buffer
         server.bind("127.0.0.1", 8000); //binding server in local host and 8000 port
