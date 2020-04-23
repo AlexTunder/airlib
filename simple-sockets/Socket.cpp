@@ -24,10 +24,9 @@ int sideTo(int *array, int start, int end){
     end = 0;
 }
 int sideTo(int **array, int start, int end){
-    for(int i = start; i < end; i++){
+    for(int i = start; i < end -1; i++){
         array[i] = array[i+1];
     }
-    array[end] = nullptr;
 }
 
 /** Basic socket interface **/
@@ -38,15 +37,29 @@ int Socket::send(std::string data, int conn){
     return sendLS(*connection[conn], data.c_str(), this->bitrade, 0);
 }
 std::string Socket::read(){
-    readLS(*connection[cc-1], buffer, this->bitrade);
+    int sub = readLS(*connection[cc-1], buffer, this->bitrade);
     if(buffer == NULL) throw(SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
 becouse it's is NULL", nullptr, 71, -1));
-    return std::string((char*)(buffer));
+    if(sub == 0){
+        throw SocketException("localhost", "Connection closed from other side", "discon", 60012, 0x71);
+        //connection closerd
+    }else if(sub < 0){
+        throw SocketException("localhost", "Connection is exsistn't or busy", "notfound", 60012, 0x72);
+        //connection already destroyed
+    }
+    else return std::string((char*)(buffer)); // connection active
 }
 std::string Socket::read(int conn){
-    readLS(*connection[conn], buffer, this->bitrade);
+    int sub = readLS(*connection[conn], buffer, this->bitrade);
     if(buffer == NULL) throw(SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
 becouse it's is NULL", nullptr, 71, -1));
+    if(sub == 0){
+        throw SocketException("localhost", "Connection closed from other side", "discon", 60012, 0x71);
+        //connection closerd
+    }else if(sub < 0){
+        throw SocketException("localhost", "Connection is exsistn't or busy", "notfound", 60012, 0x72);
+        //connection already destroyed
+    }
     return std::string((char*)(buffer));
 }
 SocketException::SocketException(char *address, char *description, char *additional, int port, int code){
@@ -201,6 +214,9 @@ becouse it's is NULL", nullptr, 71, -1));
     return str;
 }
 int ___SockPTR___uniQED__::send(std::string data){
+    // try{
+
+    // }catch()
     return sendLS(*conn[*cc-1], data.c_str(), *this->bitrade, 0);
 }
 int ___SockPTR___uniQED__::send(std::string data, int conn){

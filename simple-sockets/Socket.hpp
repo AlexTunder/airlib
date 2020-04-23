@@ -13,10 +13,13 @@
 #include <net/if.h>
 #include <iostream>
 #include <pthread.h>
+#include <signal.h>
 #define DEFAULT_LISTENER        0
 #define STOP_LISTENER           1
 #define FILE_REQUEST_LISTENER   2
 #define STREAM_LISTENER         3
+#define SOCKEXC_DISCONN         0x71
+#define SOCKEXC_BROKENP         0x71
 
 class Socket{
     public:
