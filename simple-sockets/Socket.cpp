@@ -17,7 +17,6 @@ int listenLS(int __fd, int __n){
     return listen(__fd, __n);
 }
 int sideTo(int *array, int start, int end){
-    array[start] = 0;
     for(int i = start; i < end; i++){
         array[i] = array[i+1];
     }
@@ -117,6 +116,7 @@ void *SocketServer::listen(void *arg){
         me->socketServer->threadStorage[me->socketServer->cc] = new pthread_t();
         if (listenLS(me->socketServer->fd, 3) < 0)
             throw SocketException((char*)me->socketServer->me.c_str(), "Failed for listening deamon.", "Start failed", me->socketServer->port, 0x61);
+        sleep(1);
         if ((*me->socketServer->connection[me->socketServer->cc] = accept(me->socketServer->fd, (struct sockaddr *)&me->socketServer->address,  
                         (socklen_t*)&me->socketServer->al))<0)
             throw SocketException((char*)me->socketServer->me.c_str(), "Failed for listening deamon.", "accept fail", me->socketServer->port, 0x61);

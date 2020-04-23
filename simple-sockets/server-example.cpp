@@ -7,17 +7,17 @@ void *listener(void *rawPointerToArguments){ //making listener function for comm
     try{
         sleep(1);
         pointerToArgument->ptsd->sockPtr->setBuffer(server.buffer);
-        std::cout <<"read:\t"<< pointerToArgument->ptsd->sockPtr->read(pointerToArgument->connID) << std::endl; //reading incoming message and print it
+        // std::cout <<"read:\t"<< pointerToArgument->ptsd->sockPtr->read(pointerToArgument->connID) << std::endl; //reading incoming message and print it
         while(1){ //endless loop
-            pointerToArgument->ptsd->socketServer->send("Hello!", pointerToArgument->connID); //sending "hello" message
             pointerToArgument->ptsd->socketServer->read(pointerToArgument->connID); //reading from current connection
+            pointerToArgument->ptsd->socketServer->send("Hello!", pointerToArgument->connID); //sending "hello" message
             std::cout<<pointerToArgument->ptsd->socketServer->buffer<<"\n"; //print message from buffer
         }
     }catch(SocketException e){ //if exception occuped
         std::cout<<e.description<<"\n\tAddress:"<<e.address<<"\n\tPort:"<<e.port<<"\n\taDditional info:"<<e.additional<<"\n\tCode of error:"<<e.codeOfError; //if exception happen, it's display all info
         if (e.codeOfError == SOCKEXC_DISCONN){ //if exception say about client disconnectiong
             pointerToArgument->ptsd->socketServer->cc--; //-1 from current connections
-            sideTo(pointerToArgument->ptsd->sockPtr->conn, pointerToArgument->connID, pointerToArgument->ptsd->socketServer->cc+1); //slide list with connections
+            sideTo(server.connection, pointerToArgument->connID, pointerToArgument->ptsd->socketServer->cc+1); //slide list with connections
         }
     }
 }
