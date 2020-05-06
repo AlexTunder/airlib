@@ -99,6 +99,7 @@ int SocketServer::bind(std::string addr, int port, int protocol){
     address.sin_family = AF_INET; 
     address.sin_addr.s_addr = INADDR_ANY; 
     address.sin_port = htons(port); 
+    // this->arg.sockPtr = new ___SockPTR___uniQED__(this, 1);
     if(SSLLBC(fd, (struct sockaddr *)&address, sizeof(address)))
         throw(SocketException((char*)addr.c_str(), (char*)"Failed to bind server: Host not resolved\
  or already in use.", nullptr, port, -2));
@@ -124,13 +125,32 @@ void *SocketServer::listen(void *arg){
             SOCKET_REPORTING("New user connected\n");
         #endif
         me->connectionID = me->socketServer->cc;
-        pthread_create(me->socketServer->threadStorage[me->socketServer->cc], &me->socketServer->attr, me->listener, new throwNetAttr(me, me->connectionID));
-        pthread_detach(*me->socketServer->threadStorage[me->socketServer->cc]);
+        printf("i'm here!");
+        if(me->socketServer->listener == nullptr){
+            pthread_create(me->socketServer->threadStorage[me->socketServer->cc], &me->socketServer->attr, me->listener, new throwNetAttr(me, me->connectionID));
+            pthread_detach(*me->socketServer->threadStorage[me->socketServer->cc]);
+            printf("Func");
+        }else{
+            pthread_create(me->socketServer->threadStorage[me->socketServer->cc], &me->socketServer->attr, me->socketServer->listener->threadable, new throwNetAttr(me, me->connectionID, me->socketServer->listener));
+            pthread_detach(*me->socketServer->threadStorage[me->socketServer->cc]);
+            printf("Class");
+        }
         me->socketServer->cc++;
     }
 }
 void SocketServer::start(void *(*listener)(void *arg), int maxClients){
     this->arg = {this, listener};
+	this->arg.sockPtr = new ___SockPTR___uniQED__(___SockPTR___uniQED__(this, 1));
+    this->state = 1;
+    pthread_create(&mainThread, &attr, this->listen, &arg);
+    pthread_detach(mainThread);
+}
+void NetworkListener::Set___SockPTR___uniQED__(___SockPTR___uniQED__ *sockptr){
+    this->listeners.arg = sockptr;
+}
+void SocketServer::start(NetworkListener *listener, int maxClients){
+    this->arg = {this, nullptr};
+    this->listener = listener;
 	this->arg.sockPtr = new ___SockPTR___uniQED__(___SockPTR___uniQED__(this, 1));
     this->state = 1;
     pthread_create(&mainThread, &attr, this->listen, &arg);
@@ -182,21 +202,23 @@ void NetworkListener::SetListener(int type, void (*listener)(void *attr)){
     else throw(SocketException((char*)"localhost/programm", (char*)"unknowen listener type", (char*)std::to_string(type).c_str(), 0x000, -9));
 }
 
-void NetworkListener::send(void *arg, char *data){
-	netServerAttribures *attr = (netServerAttribures*)(arg);
-	___SockPTR___uniQED__ *sockptr = getSockPointerFromAttr(attr);
-    sockptr->send(data, sockptr->connn);
-}
-char *NetworkListener::read(void *arg){
-	netServerAttribures *attr = (netServerAttribures*)(arg);
-	___SockPTR___uniQED__ *sockptr = getSockPointerFromAttr(attr);
-    return (char*)(sockptr->read(sockptr->connn)).c_str();
-}
-void NetworkListener::__Main__(void *arg){
-	netServerAttribures *attr = (netServerAttribures*)(arg);
-	___SockPTR___uniQED__ *sockptr = getSockPointerFromAttr(attr);
-	this->listeners.defaultListener(arg);
-}
+
+/***           Useless shit                   ***/
+// void NetworkListener::send(void *arg, char *data){
+// 	netServerAttribures *attr = (netServerAttribures*)(arg);
+// 	___SockPTR___uniQED__ *sockptr = getSockPointerFromAttr(attr);
+//     sockptr->send(data, sockptr->connn);
+// }
+// char *NetworkListener::read(void *arg){
+// 	netServerAttribures *attr = (netServerAttribures*)(arg);
+// 	___SockPTR___uniQED__ *sockptr = getSockPointerFromAttr(attr);
+//     return (char*)(sockptr->read(sockptr->connn)).c_str();
+// }
+// void NetworkListener::threadable(void *arg){
+// 	netServerAttribures *attr = (netServerAttribures*)(arg);
+// 	___SockPTR___uniQED__ *sockptr = getSockPointerFromAttr(attr);
+// 	this->listeners.defaultListener(arg);
+// }
 
 std::string ___SockPTR___uniQED__::read(){
     readLS(*conn[*cc-1], this->buffer, *this->bitrade);
@@ -205,18 +227,13 @@ becouse it's is NULL", nullptr, 71, -1));
     return std::string((char*)(buffer));
 }
 std::string ___SockPTR___uniQED__::read(int conn){
-    char *buf = this->buffer;
     if(readLS(*this->conn[conn], this->buffer, *this->bitrade)<0) printf("readLS is 0");
-    this->buffer = buf;
     if(buffer == nullptr) throw(SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
 becouse it's is NULL", nullptr, 71, -1));
     std::string str = this->buffer;
     return str;
 }
 int ___SockPTR___uniQED__::send(std::string data){
-    // try{
-
-    // }catch()
     return sendLS(*conn[*cc-1], data.c_str(), *this->bitrade, 0);
 }
 int ___SockPTR___uniQED__::send(std::string data, int conn){
@@ -255,4 +272,38 @@ ___SockPTR___uniQED__* getSockPointerFromAttr(SocketServer::throwenSocketServerS
 throwNetAttr::throwNetAttr(netServerAttribures *attr, int conn){
     this->ptsd = attr;
     this->ptsd->sockPtr->connn = this->connID = conn;
+    this->listener = nullptr;
+}
+throwNetAttr::throwNetAttr(netServerAttribures *attr, int conn, NetworkListener *listener){
+    this->ptsd = attr;
+    this->ptsd->sockPtr->connn = this->connID = conn;
+    this->listener = listener;
+}
+
+void *NetworkListener::threadable(void *arg){
+    throwNetAttr *me = (throwNetAttr*)(arg);
+    me->listener->listeners.defaultListener(arg);
+}
+
+___SockPTR___uniQED__ *getAttributes(void *pointer){
+    return (___SockPTR___uniQED__*)(pointer);
+}
+
+void ListenerStream::setBuffer(char *buffer){
+    this->buffer = buffer;
+}
+std::string ListenerStream::read(){
+    this->attributes->ptsd->sockPtr->setBuffer(this->buffer);
+    return this->attributes->ptsd->sockPtr->read(this->attributes->connID);
+}
+void ListenerStream::send(std::string data){
+    this->attributes->ptsd->sockPtr->send(data, this->attributes->connID);
+}
+ListenerStream::ListenerStream(void *arg){
+    this->attributes = (throwNetAttr*)(arg);
+    std::cout << this->attributes->ptsd->sockPtr->fd << std::endl;
+}
+void ListenerStream::close(){
+    *(this->attributes->ptsd->sockPtr->cc)--;
+    sideTo(this->attributes->ptsd->sockPtr->conn, this->attributes->connID, *(this->attributes->ptsd->sockPtr->cc)+2);
 }

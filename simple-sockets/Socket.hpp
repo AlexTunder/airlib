@@ -85,10 +85,11 @@ class SocketServer : public Socket{
         /*** I should to use this structure, becouse it's have dependes ***/
         int bind(std::string addr, int port, int protocol = SOCK_STREAM);
         void start(void *(*listener)(void *arg), int maxClients);
-        void start(NetworkListener listener, int maxClients);
+        void start(NetworkListener *listener, int maxClients);
         struct throwenSocketServerStruct arg;
         static void *listen(void *arg);
         pthread_t **threadStorage;
+        NetworkListener *listener;
         int port; std::string me;
         pthread_t mainThread;
         pthread_attr_t attr;
@@ -100,30 +101,52 @@ class NetworkListener{
     private:
         char command[3][3];
         struct listenersStruct{
+            ___SockPTR___uniQED__ *arg;
             void (*stopListener)(void *arg);
             void (*streamListener)(void *arg);
             void (*defaultListener)(void *arg);
             void (*fileReaquestListener)(void *arg);
-            SocketServer::throwenSocketServerStruct *arg;
         }listeners;
         void *(*mainListener)(void *parg);
-        void __Main__(void *arg);
-        Socket *targer;
     public:
-        char*read(void *arg);
+        // char*read(void *arg);
         void setStopCom(char com[3]);
         void setStreanCom(char com[3]);
-        void send(void *arg,char *data);
+        // void send(void *arg,char *data);
+        static void *threadable(void *arg);
         void setFileRequestCom(char com[3]);
-        char*read(void (*descriptor)(char *));
-        void send(char *data, void (*descriptor)(char *));
+        // char*read(void (*descriptor)(char *));
+        // void send(char *data, void (*descriptor)(char *));
         void SetListener(int type, void (*listener)(void *parg));
+
+        void Set___SockPTR___uniQED__(___SockPTR___uniQED__ *sockptr);
 };
 
 class SocketClient : public Socket{
     public:
         SocketClient();
         int connect(std::string addr, int port, int protocol = SOCK_STREAM);
+};
+
+class throwNetAttr{
+    public:
+        SocketServer::throwenSocketServerStruct *ptsd;
+        int connID;
+        NetworkListener *listener;
+        throwNetAttr(SocketServer::throwenSocketServerStruct *netData, int connID); 
+        throwNetAttr(SocketServer::throwenSocketServerStruct *attr, int conn, NetworkListener *listener);
+};
+
+class ListenerStream{
+    private:
+        throwNetAttr *attributes;
+        char *buffer;
+    public:
+        void close();
+        std::string read();
+        ListenerStream(void *arg);
+        void send(std::string data);
+        void setBuffer(char *buffer);
 };
 
 class Coder{
@@ -148,13 +171,7 @@ void anonimusDecode(char*, char*);
 
 ___SockPTR___uniQED__* getSockPointerFromAttr(SocketServer::throwenSocketServerStruct *attr);
 
-class throwNetAttr{
-    public:
-        SocketServer::throwenSocketServerStruct *ptsd;
-        int connID;
-        throwNetAttr(SocketServer::throwenSocketServerStruct *netData, int connID); 
-};
-
 #define netServerAttribures SocketServer::throwenSocketServerStruct
+#define NetworkAttributes ___SockPTR___uniQED__ 
 #include "Socket.cpp"
 #endif
