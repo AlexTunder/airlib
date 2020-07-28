@@ -95,6 +95,8 @@ class SocketServer : public Socket{
         pthread_attr_t attr;
         SocketServer();
         int state = 0;
+        pthread_mutex_t mutex;
+        pthread_mutexattr_t mutexattr;
 };
 
 class NetworkListener{
@@ -126,6 +128,7 @@ class SocketClient : public Socket{
     public:
         SocketClient();
         int connect(std::string addr, int port, int protocol = SOCK_STREAM);
+        int read();
 };
 
 class throwNetAttr{
@@ -143,6 +146,7 @@ class ListenerStream{
         char *buffer;
     public:
         void close();
+        int getCurrent();
         std::string read();
         ListenerStream(void *arg);
         void send(std::string data);

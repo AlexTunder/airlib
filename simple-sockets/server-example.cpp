@@ -42,7 +42,7 @@ int main(){
             }
         }catch(SocketException e){ //if exception occuped
             std::cout<<e.description<<"\n\tAddress:"<<e.address<<"\n\tPort:"<<e.port<<"\n\taDditional info:"<<e.additional<<"\n\tCode of error:"<<e.codeOfError; //if exception happen, it's display all info
-            if (e.codeOfError == SOCKEXC_DISCONN){ //if exception say about client disconnectiong
+            if (e.codeOfError == SOCKEXC_DISCONN || e.codeOfError == SOCKEXC_BROKENP){ //if exception say about client disconnectiong
                 stream.close(); //close current stream & connection
             }
         }
