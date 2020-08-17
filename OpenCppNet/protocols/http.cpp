@@ -1,14 +1,26 @@
+#pragma once
+
+#ifndef HTTP_LIB
 #include <./http.hpp>
-HttpRequest configureAnswer(const char *file){
+#endif
+
+HttpRequest configureAnswer(const char *file, char *errpath, char *root){
     HttpRequest sub;
+    //debug
+    // char a[16];
+    // printf("%s",getcwd());
     FILE *target = fopen(file, "r");
     if(target == NULL){
-        target = fopen(HTTP_404_FN, "r");
+        sub.setType((HttpRequestType)404);
+        char errorpath[64] = "";
+        strcpy(errorpath, errpath);
+        strcat(errorpath, "/404.html");
+        target = fopen(errorpath, "r");
         if(target == NULL)
             throw HTTP_404_EX(file);
         else{
-            char __fread_404[2048];
-            fread(__fread_404, 1, 2048, target);
+            char __fread_404[HTTP_ERR_SZ];
+            fread(__fread_404, 1, HTTP_ERR_SZ, target);
             sub.setContent(__fread_404);
             sub.setType(HttpRequestType::E404);
             free(__fread_404);
@@ -16,11 +28,11 @@ HttpRequest configureAnswer(const char *file){
             return sub;
         }
     }else{
+        sub.setType((HttpRequestType)200);
         char __fread[HTTP_BITRATE];
         fread(__fread, 1, HTTP_BITRATE, target);
         sub.setContent(__fread);
-        sub.setType(HttpRequestType::ALLOK);
-        free(__fread);
+        sub.setType(HttpRequestType::ALLOK);\
         fclose(target);
         return sub;
     }
@@ -56,6 +68,8 @@ void HttpRequest::setType(HttpRequestType type){
         strcpy(this->method, "HEAD $target HTTP/1.1");
     }else if(type == HttpRequestType::CONNECT){
         strcpy(this->method, "CONNECT $target HTTP/1.1");
+    }else{
+        sprintf(this->method, "HTTP/1.1 %i");
     }
 }
 void HttpRequest::setValue(const char *fieldname, const char *value){
@@ -69,7 +83,7 @@ void HttpRequest::setValue(const char *fieldname, const char *value){
 }
 HttpRequestType HttpRequest::getType(){
     HttpRequestType rt;
-    char *firstWordOfMethod = new char[16];
+    char *firstWordOfMethod;
     firstWordOfMethod = strtok(this->method, " ");
     if(!strcmp(firstWordOfMethod, "GET"))
         rt = HttpRequestType::GET;
@@ -81,4 +95,18 @@ HttpRequestType HttpRequest::getType(){
         rt = HttpRequestType::CONNECT;
     else rt = (HttpRequestType)atoi(firstWordOfMethod);
     return rt;
+}
+void HttpRequest::operator=(HttpRequest req){
+    this->method = new char(strlen(req.method));
+    strcpy(this->method, req.method);
+    if(req.fields != NULL && *req.fields != NULL){
+        for(int i = 0; req.fields[i] != NULL; i++){
+            this->fields[i] = new char(strlen(req.fields[i]));
+            this->value[i] = new char(strlen(req.value[i]));
+            strcpy(this->fields[i], req.fields[i]);
+            strcpy(this->value[i], req.value[i]);
+        }
+    }
+    this->content = new char(strlen(req.content));
+    strcpy(this->content, req.content);
 }

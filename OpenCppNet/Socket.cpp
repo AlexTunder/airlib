@@ -188,28 +188,10 @@ int SocketClient::connect(std::string addr, int port, int protocol){
 
 /*** NetworkListener interface **/
 
-void NetworkListener::setStopCom(char com[3]){
-    for(int i = 0; i < 3; i++)
-        this->command[0][i] = com[i];
-}
-void NetworkListener::setStreanCom(char com[3]){
-    for(int i = 0; i < 3; i++)
-        this->command[1][i] = com[i];
-}
-void NetworkListener::setFileRequestCom(char com[3]){
-    for(int i = 0; i < 3; i++)
-        this->command[2][i] = com[i];
-}
 
 void NetworkListener::SetListener(int type, void (*listener)(void *attr)){
     if(type == DEFAULT_LISTENER)
         this->listeners.defaultListener = listener;
-    else if(type == FILE_REQUEST_LISTENER)
-        this->listeners.fileReaquestListener = listener;
-    else if(type == STOP_LISTENER)
-        this->listeners.stopListener = listener;
-    else if(type == STREAM_LISTENER)
-        this->listeners.streamListener = listener;
     else throw(SocketException((char*)"localhost/programm", (char*)"unknowen listener type", (char*)std::to_string(type).c_str(), 0x000, -9));
 }
 

@@ -14,12 +14,13 @@
 #include <iostream>
 #include <pthread.h>
 #include <signal.h>
+//Listeners
 #define DEFAULT_LISTENER        0
-#define STOP_LISTENER           1
-#define FILE_REQUEST_LISTENER   2
-#define STREAM_LISTENER         3
+#define UPLOADS_LISTENER        1
+//Exception codes
 #define SOCKEXC_DISCONN         0x71
-#define SOCKEXC_BROKENP         0x71
+#define SOCKEXC_BROKENP         0x72
+#define SOCKEXC_TIMEOUT         0x73
 
 class Socket{
     public:
@@ -70,26 +71,35 @@ class SocketException{
         SocketException(char *address, char *description, char *additional, int port, int code);
         char *address, *description, *additional;
         int port, codeOfError;
+        bool operator==(SocketException e);
+        bool operator==(int codeOfException);
 };
+
+SocketException SockTimeOut("", "Time for connection is out.", "", 0, SOCKEXC_TIMEOUT);
 
 class NetworkListener;
 
 class SocketServer : public Socket{
+    //Да и вообще здесь много говна, надо поменять
     public:
+        //Надо переписать! Но не срочно, пока работает. Но вообще - сменить всю эту хню...
+        // ...на тупо 2 поинтера - клиент и сервер. И мозги ипать не надо, ___sock_ptr_ пропадет
+        // ... и с этим уйдет и говнокод, но ListenerStream надо оставить, ибо негоже в листенере...
+        // ... давать сразу поинтер на сам сервер или кллиент.
         struct throwenSocketServerStruct{
             SocketServer *socketServer = nullptr;
             void *(*listener)(void *arg);
             int connectionID;
             ___SockPTR___uniQED__ *sockPtr = nullptr;
         };
-        /*** I should to use this structure, becouse it's have dependes ***/
+        /*** Yet I should to use this structure, becouse it's have dependes ***/
         int bind(std::string addr, int port, int protocol = SOCK_STREAM);
         void start(void *(*listener)(void *arg), int maxClients);
         void start(NetworkListener *listener, int maxClients);
         struct throwenSocketServerStruct arg;
         static void *listen(void *arg);
         pthread_t **threadStorage;
-        NetworkListener *listener;
+        NetworkListener *listener; //Стоило бы убрать и сделать что то другое
         int port; std::string me;
         pthread_t mainThread;
         pthread_attr_t attr;
@@ -101,27 +111,22 @@ class SocketServer : public Socket{
 
 class NetworkListener{
     private:
-        char command[3][3];
         struct listenersStruct{
             ___SockPTR___uniQED__ *arg;
-            void (*stopListener)(void *arg);
-            void (*streamListener)(void *arg);
+            void (*downstream)(void *arg); //If double-stream enable use as download stream and write data to buffer
+            void (*upstream)(void *arg); //If double-stream enable use as upload stream and send data from buffer
             void (*defaultListener)(void *arg);
-            void (*fileReaquestListener)(void *arg);
         }listeners;
         void *(*mainListener)(void *parg);
     public:
-        // char*read(void *arg);
-        void setStopCom(char com[3]);
-        void setStreanCom(char com[3]);
-        // void send(void *arg,char *data);
         static void *threadable(void *arg);
-        void setFileRequestCom(char com[3]);
-        // char*read(void (*descriptor)(char *));
-        // void send(char *data, void (*descriptor)(char *));
         void SetListener(int type, void (*listener)(void *parg));
-
         void Set___SockPTR___uniQED__(___SockPTR___uniQED__ *sockptr);
+        
+        //Work like low-level read() and send(), but have timeout (default = 1000ms)
+        //If time out throw SocketException (TimeOutException)
+        void sendRequest(const char *data);
+        char *readRequest();
 };
 
 class SocketClient : public Socket{
