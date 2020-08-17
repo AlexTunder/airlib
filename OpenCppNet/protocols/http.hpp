@@ -19,7 +19,7 @@
 #define HTTP 1.1
 
 enum HttpRequestType {
-    GET = 0, POST, HEAD, CONNECT, ERROR, ALLOK, E404 = 404
+    GET = 0, POST, HEAD, CONNECT, ALLOK = 200, E404 = 404
 };
 
 class HttpServer;
@@ -43,9 +43,13 @@ class HttpRequest{
         char* getContent();
         void setType(HttpRequestType rt);
         HttpRequestType getType();
+        HttpRequest();
+
+        char *flush(char *to = NULL);
+        void fill(char *src);
 };
 
-HttpRequest configureAnswer(const char *file);
+HttpRequest configureAnswer(const char *file, char *errpath, char *root);
 HttpRequest configureRequest(const char *file);
 
 class HttpServer{
