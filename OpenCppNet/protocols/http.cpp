@@ -98,6 +98,7 @@ HttpRequestType HttpRequest::getType(){
         rt = (HttpRequestType)atoi(firstWordOfMethod);
     }
     strcpy(this->method, tmp);
+    // strcpy()
     return rt;
 }
 void HttpRequest::operator=(HttpRequest req){
@@ -129,4 +130,24 @@ char *HttpRequest::flush(char *to){
         sprintf(__sub, "%s\n%s: %s", __sub, this->fields[i], this->value[i]);
     sprintf(__sub, "%s\n\n%s", __sub, this->content);
     return __sub;
+}
+void HttpRequest::fill(char *src){
+    /***
+    pseudo:
+        first = getFirstLine(src);
+        type = getTypeByDescription(src[0]) //get/post/other
+        target = src[1]
+
+    */
+}
+HttpRequest configureRequest(const char *file, HttpRequestType rt, char *additional = NULL){
+    HttpRequest sub;
+    char *frst = new char[64];
+    if(rt == HttpRequestType::GET)
+            sprintf(frst, "GET %s HTTP/1.1\n", file);
+    else if(rt == HttpRequestType::POST)
+            sprintf(frst, "POST %s HTTP/1.1\n", file);
+    else if(rt == HttpRequest::HEAD)
+            sprintf(frst, "HEAD %s HTTP/1.1\n", file);
+    else throw HTTP_IUK_EX;
 }

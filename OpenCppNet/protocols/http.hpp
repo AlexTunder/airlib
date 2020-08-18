@@ -5,18 +5,22 @@
 #define HTTP_404_EX(file) SocketException("localhost:server","Error file not found", (char*)file, int(HTTP_LIB), int((0x01a<<4)&404))
 #define HTTP_IUK_EX SocketException("localhost:configure request", "Unknowen method", NULL, int(HTTP_LIB), int((0x01a<<4)&500))
 #define HTTP_INF_EX SocketException("localhost:set value", "NULL fieldname of value", NULL, int(HTTP_LIB), int((0x01a<<4)&500))
+#define HTTP_IRF_EX 
 #define HTTP_500_FN "$none"
 
 #pragma once
 #include <string.h>
-
-#ifndef HTTP_LIB 0x01a
-
-#ifndef HTTP_BITRATE
-    #define HTTP_BITRATE 3072
+#include <stdio.h>
+#ifndef SCFD
+ #include "../Socket.hpp"
 #endif
+#ifndef HTTP_LIB
+ #define HTTP_LIB 0x01a
+ #ifndef HTTP_BITRATE
+  #define HTTP_BITRATE 3072
+ #endif
 
-#define HTTP 1.1
+ #define HTTP 1.1
 
 enum HttpRequestType {
     GET = 0, POST, HEAD, CONNECT, ALLOK = 200, E404 = 404
@@ -50,7 +54,7 @@ class HttpRequest{
 };
 
 HttpRequest configureAnswer(const char *file, char *errpath, char *root);
-HttpRequest configureRequest(const char *file);
+HttpRequest configureRequest(const char *file, HttpRequestType rt, char *additional = NULL);
 
 class HttpServer{
     //This class work with socket and fill 
