@@ -1,8 +1,34 @@
 #pragma once
 
 #ifndef HTTP_LIB
-#include <./http.hpp>
+ #include <./http.hpp>
 #endif
+#include <string.h>
+
+void cpfrag(char *to, char *from, int size){
+    for(int i = 0; i < size - 1; i++)
+        to[i] = from[i];
+}
+
+char *replace(const char *s, const char *old, const char *news){
+    char *sub = new char[strlen(s) - strlen(old) + strlen(news)];
+    char *_old = new char[strlen(old)];
+    int counter = 0;
+
+    strcpy(sub, "");
+    for(int i = 0; s[i] != NULL; i++){
+        cpfrag(_old, (char*)&(s[i]), sizeof(old));
+        if(!strcmp(_old, old)){
+            sprintf(sub, "%s%s", sub, news);
+            i += strlen(old) - 1;
+        }else{
+            sprintf(sub, "%s%c", sub, s[i]);
+        }
+    }
+
+    return sub;
+}
+
 
 HttpRequest configureAnswer(const char *file, char *errpath, char *root){
     HttpRequest sub;
@@ -54,6 +80,7 @@ char *HttpRequest::getValue(const char *value){
 char *HttpRequest::getContent(){
     return this->content;
 }
+/***************************** Setters *****************************/
 void HttpRequest::setContent(const char *content){
     this->content = new char[strlen(content)+1];
     strcpy(this->content, content);
@@ -73,12 +100,17 @@ void HttpRequest::setType(HttpRequestType type){
     }
 }
 void HttpRequest::setValue(const char *fieldname, const char *value){
-    int i = 0;
-    for(; this->fields[i] != NULL; i++);
-    this->fields[i] = new char[strlen(fieldname)];
-    this->value[i] = new char[strlen(value)];
-    strcpy(fields[i], fieldname);
-    strcpy(this->value[i], value);
+    if(!strcmp(fieldname, "$target")){
+        if(value[0] != '/') throw HTTP_IRF_EX("You shuld to get files from /");
+        this->method = replace(this->method, "$target", value);
+    }else{
+        int i = 0;
+        for(; this->fields[i] != NULL; i++);
+        this->fields[i] = new char[strlen(fieldname)];
+        this->value[i] = new char[strlen(value)];
+        strcpy(fields[i], fieldname);
+        strcpy(this->value[i], value);
+    }
 }
 HttpRequestType HttpRequest::getType(){
     HttpRequestType rt;
@@ -112,8 +144,10 @@ void HttpRequest::operator=(HttpRequest req){
             strcpy(this->value[i], req.value[i]);
         }
     }
-    this->content = new char[strlen(req.content)+1];
-    strcpy(this->content, req.content);
+    if(req.content != NULL){
+        this->content = new char[strlen(req.content)+1];
+        strcpy(this->content, req.content);
+    }
 }
 HttpRequest::HttpRequest(){
     this->fields = new char *;
@@ -125,29 +159,36 @@ char *HttpRequest::flush(char *to){
         __sub= new char[HTTP_BITRATE];
     else
         __sub = to;
+    if(this->method == NULL || *this->method == 0) throw HTTP_IRF_EX("Method line is empty or NULL");
     sprintf(__sub, "%s", this->method);
     for(int i = 0; this->fields[i] != NULL; i++)
         sprintf(__sub, "%s\n%s: %s", __sub, this->fields[i], this->value[i]);
-    sprintf(__sub, "%s\n\n%s", __sub, this->content);
+    if(this->content != NULL)
+        sprintf(__sub, "%s\n\n%s", __sub, this->content);
     return __sub;
 }
 void HttpRequest::fill(char *src){
-    /***
-    pseudo:
-        first = getFirstLine(src);
-        type = getTypeByDescription(src[0]) //get/post/other
-        target = src[1]
-
-    */
+    HttpRequestType rt;
+    //Get 1st line
+    char *tmp = new char[strlen(src)], *fl;
+    strcpy(tmp, src);
+    fl = strtok(tmp, "\n");
+    strcpy(this->method, fl);
+    //Get type of request
+    rt = this->getType();
+    //If this is request, get target
+    if(rt > 100){ //becouse all HTTP codes have 3 nums
+        
+    }
 }
-HttpRequest configureRequest(const char *file, HttpRequestType rt, char *additional = NULL){
+HttpRequest configureRequest(const char *file, HttpRequestType rt, char *additional){
     HttpRequest sub;
-    char *frst = new char[64];
-    if(rt == HttpRequestType::GET)
-            sprintf(frst, "GET %s HTTP/1.1\n", file);
-    else if(rt == HttpRequestType::POST)
-            sprintf(frst, "POST %s HTTP/1.1\n", file);
-    else if(rt == HttpRequest::HEAD)
-            sprintf(frst, "HEAD %s HTTP/1.1\n", file);
-    else throw HTTP_IUK_EX;
+    sub.setType(rt);
+    sub.setValue("$target", file);
+    if(rt == HttpRequestType::POST)
+        if(additional != NULL)
+            sub.setContent(additional);
+        else
+            throw HTTP_IRF_EX("Body of post is empty");
+    return sub;
 }

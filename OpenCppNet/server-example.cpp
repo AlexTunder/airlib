@@ -1,4 +1,5 @@
 #include "./Socket.hpp" //include library
+#include "protocols/http.hpp"
 
 SocketServer server; //making server object
 
@@ -15,13 +16,17 @@ int main(){
     for(int i = 0; i<1024; i++)
         readingBuffer[i] = 0;
     listener.SetListener(DEFAULT_LISTENER,[](void *attr){
+        HttpRequest answer;
         ListenerStream stream(attr); //Declare stream with connection
         stream.setBuffer(readingBuffer); //istall buffer for this stream
         try{ // try to do next:
             while (1){ //endless loop: this is active, when connection exist
                 stream.read(); //reading data
                 std::cout<<std::string(readingBuffer)<<std::endl; //display buffer
-                stream.send("ALLOK"); //send ALLOK string
+                answer = configureAnswer("/README.md", "/home/alexthunder/hentai/globus/OpenCppNet/protocols/err", "/home/alexthunder/hentai/globus/OpenCppNet");
+                char aft[2048];
+                answer.flush(aft);
+                stream.send(aft); //send ALLOK string
             }
         }catch(SocketException e){ //if exception occuped
             std::cout<<e.description<<"\n\tAddress:"<<e.address<<"\n\tPort:"<<e.port<<"\n\taDditional info:"<<e.additional<<"\n\tCode of error:"<<e.codeOfError; //if exception happen, it's display all info

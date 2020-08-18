@@ -3,9 +3,9 @@
 #define HTTP_ERR_SZ 2048
 #define HTTP_404_FN "404.html"
 #define HTTP_404_EX(file) SocketException("localhost:server","Error file not found", (char*)file, int(HTTP_LIB), int((0x01a<<4)&404))
-#define HTTP_IUK_EX SocketException("localhost:configure request", "Unknowen method", NULL, int(HTTP_LIB), int((0x01a<<4)&500))
-#define HTTP_INF_EX SocketException("localhost:set value", "NULL fieldname of value", NULL, int(HTTP_LIB), int((0x01a<<4)&500))
-#define HTTP_IRF_EX 
+#define HTTP_IUK_EX(additional) SocketException("localhost:configure request", additional, NULL, int(HTTP_LIB), int((0x01a<<4)&500))
+#define HTTP_INF_EX(additional) SocketException("localhost:set value", additional, NULL, int(HTTP_LIB), int((0x01a<<4)&10))
+#define HTTP_IRF_EX(additional) SocketException("localhost:invalid request", additional, NULL, int(HTTP_LIB), int((0x01a<<4)&51))
 #define HTTP_500_FN "$none"
 
 #pragma once
