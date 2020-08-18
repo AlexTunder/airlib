@@ -10,13 +10,23 @@ void cpfrag(char *to, char *from, int size){
         to[i] = from[i];
 }
 
+char *readWord(char *from, char *separator, int __n = 0){
+    char *tmp = new char[strlen(from)], *sub;
+    strcpy(tmp, from);
+    sub = strtok(tmp, separator);
+    for(int i = 0; i < __n; i++){
+        sub = strtok(NULL, separator);
+    }
+    return sub;
+}
+
 char *replace(const char *s, const char *old, const char *news){
     char *sub = new char[strlen(s) - strlen(old) + strlen(news)];
     char *_old = new char[strlen(old)];
     int counter = 0;
 
     strcpy(sub, "");
-    for(int i = 0; s[i] != NULL; i++){
+    for(int i = 0; s[i] != 0; i++){
         cpfrag(_old, (char*)&(s[i]), sizeof(old));
         if(!strcmp(_old, old)){
             sprintf(sub, "%s%s", sub, news);
@@ -25,7 +35,6 @@ char *replace(const char *s, const char *old, const char *news){
             sprintf(sub, "%s%c", sub, s[i]);
         }
     }
-
     return sub;
 }
 
@@ -103,14 +112,15 @@ void HttpRequest::setValue(const char *fieldname, const char *value){
     if(!strcmp(fieldname, "$target")){
         if(value[0] != '/') throw HTTP_IRF_EX("You shuld to get files from /");
         this->method = replace(this->method, "$target", value);
-    }else{
-        int i = 0;
-        for(; this->fields[i] != NULL; i++);
-        this->fields[i] = new char[strlen(fieldname)];
-        this->value[i] = new char[strlen(value)];
-        strcpy(fields[i], fieldname);
-        strcpy(this->value[i], value);
     }
+    
+    int i = 0;
+    for(; this->fields[i] != NULL; i++);
+    this->fields[i] = new char[strlen(fieldname)];
+    this->value[i] = new char[strlen(value)];
+    strcpy(fields[i], fieldname);
+    strcpy(this->value[i], value);
+
 }
 HttpRequestType HttpRequest::getType(){
     HttpRequestType rt;
@@ -173,12 +183,23 @@ void HttpRequest::fill(char *src){
     char *tmp = new char[strlen(src)], *fl;
     strcpy(tmp, src);
     fl = strtok(tmp, "\n");
+    this->method = new char[strlen(fl)];
     strcpy(this->method, fl);
     //Get type of request
     rt = this->getType();
     //If this is request, get target
-    if(rt > 100){ //becouse all HTTP codes have 3 nums
-        
+    if(rt < HttpRequestType(100)){ //becouse all HTTP codes have 3 nums
+        char *target = readWord(this->method, " ", 1);
+        this->setValue("$target", target);
+    }
+    //Get other arguments...
+    char *thisLine, *val, *fn;
+    for(int i = 1; ;i++){
+        thisLine = readWord(src, "\n", i);
+        if(thisLine == NULL) break;
+        fn = readWord(thisLine, ": ", 0);
+        val = readWord(thisLine, ": \n\0", 1);
+        this->setValue(fn, val);
     }
 }
 HttpRequest configureRequest(const char *file, HttpRequestType rt, char *additional){
