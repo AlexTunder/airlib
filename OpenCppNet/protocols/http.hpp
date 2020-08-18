@@ -29,7 +29,6 @@ enum HttpRequestType {
 class HttpServer;
 class HttpRequest;
 class HttpClient;
-class HttpServerBlank;
 class HttpException;
 
 class HttpRequest{
