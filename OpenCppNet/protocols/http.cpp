@@ -20,6 +20,16 @@ char *readWord(char *from, char *separator, int __n = 0){
     return sub;
 }
 
+char *readWord(char *from, const char *separator, int __n = 0){
+    char *tmp = new char[strlen(from)], *sub;
+    strcpy(tmp, from);
+    sub = strtok(tmp, separator);
+    for(int i = 0; i < __n; i++){
+        sub = strtok(NULL, separator);
+    }
+    return sub;
+}
+
 char *replace(const char *s, const char *old, const char *news){
     char *sub = new char[strlen(s) - strlen(old) + strlen(news)];
     char *_old = new char[strlen(old)];
@@ -39,7 +49,7 @@ char *replace(const char *s, const char *old, const char *news){
 }
 
 
-HttpRequest configureAnswer(const char *file, char *errpath, char *root){
+HttpRequest configureAnswer(const char *file, const char *errpath, const char *root){
     HttpRequest sub;
     char *fn = new char[4096];
     strcpy(fn, root);

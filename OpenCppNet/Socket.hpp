@@ -17,10 +17,12 @@
 //Listeners
 #define DEFAULT_LISTENER        0
 #define UPLOADS_LISTENER        1
+#define DOWNLOAD_LISTENER       2
 //Exception codes
 #define SOCKEXC_DISCONN         0x71
 #define SOCKEXC_BROKENP         0x72
 #define SOCKEXC_TIMEOUT         0x73
+#define SOCKEXC_UNCERTL         0x81
 
 class Socket{
     public:
@@ -68,7 +70,7 @@ class ___SockPTR___uniQED__{
 
 class SocketException{
     public:
-        SocketException(char *address, char *description, char *additional, int port, int code);
+        SocketException(const char *address, const char *description, const char *additional, int port, int code);
         char *address, *description, *additional;
         int port, codeOfError;
         bool operator==(SocketException e);
@@ -120,7 +122,7 @@ class NetworkListener{
         void *(*mainListener)(void *parg);
     public:
         static void *threadable(void *arg);
-        void SetListener(int type, void (*listener)(void *parg));
+        void setListener(int type, void (*listener)(void *parg));
         void Set___SockPTR___uniQED__(___SockPTR___uniQED__ *sockptr);
         
         //Work like low-level read() and send(), but have timeout (default = 1000ms)
@@ -156,23 +158,6 @@ class ListenerStream{
         ListenerStream(void *arg);
         void send(std::string data);
         void setBuffer(char *buffer);
-};
-
-class Coder{
-    private:
-        char *src, *out;
-    public:
-        void (*algo)(char*, char*);
-};
-
-class Encoder : public Coder{
-    public:
-        char *operator()(char *src, char *key);
-};
-
-class Decoder : public Coder{
-    public:
-        char *operator()(char *src, char *key);
 };
 
 void anonimusEncode(char*, char*);

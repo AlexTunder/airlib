@@ -52,7 +52,7 @@ class HttpRequest{
         void fill(char *src);
 };
 
-HttpRequest configureAnswer(const char *file, char *errpath, char *root);
+HttpRequest configureAnswer(const char *file, const char *errpath, const char *root);
 HttpRequest configureRequest(const char *file, HttpRequestType rt, char *additional = NULL);
 
 class HttpServer{
@@ -78,5 +78,4 @@ class HttpClient{
 };
 
 #endif
-#define HTTP_LIB
 #include "./http.cpp"

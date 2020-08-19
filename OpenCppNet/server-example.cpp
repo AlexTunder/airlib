@@ -15,7 +15,7 @@ char readingBuffer[1024]; //reading buffer
 int main(){
     for(int i = 0; i<1024; i++)
         readingBuffer[i] = 0;
-    listener.SetListener(DEFAULT_LISTENER,[](void *attr){
+    listener.setListener(DEFAULT_LISTENER,[](void *attr){
         HttpRequest answer;
         ListenerStream stream(attr); //Declare stream with connection
         stream.setBuffer(readingBuffer); //istall buffer for this stream
