@@ -70,7 +70,7 @@ SocketException::SocketException(const char *address, const char *description, c
     strcpy(this->address, address);
     this->description = (char*)malloc(strlen(description));
     strcpy(this->description, description);
-    this->additional = (char*)malloc(strlen(address));
+    this->additional = (char*)malloc(strlen(additional));
     strcpy(this->additional, additional);
     this->port = port;
     this->codeOfError = code;
@@ -105,7 +105,7 @@ SocketServer::SocketServer(){
     pthread_mutex_init(&this->mutex, &mutexattr);
 }
 int SocketServer::bind(std::string addr, int port, int protocol){
-    this->buffer = new char;
+    this->buffer = new char[this->bitrade];
     this->me = addr;    this->port = port;
     fd = socket(AF_INET, protocol, 0);
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
@@ -115,13 +115,13 @@ int SocketServer::bind(std::string addr, int port, int protocol){
     // this->arg.sockPtr = new ___SockPTR___uniQED__(this, 1);
     if(SSLLBC(fd, (struct sockaddr *)&address, sizeof(address)))
         throw(SocketException((char*)addr.c_str(), (char*)"Failed to bind server: Host not resolved\
- or already in use.", nullptr, port, -2));
+ or already in use.", "host already in use", port, -2));
     if (fd == 0)
         throw(SocketException((char*)addr.c_str(), (char*)"Failed to bind server: file description\
-is null.", nullptr, port, -1));
+is null.", "iternal error", port, -1));
     if(opt < 0)
         throw(SocketException((char*)addr.c_str(), (char*)"Failed to bind server: socket options\
-is null or not resolved.", nullptr, port, -3));
+is null or not resolved.", "sockopt is invalid", port, -3));
     return(address.sin_port);
 }
 void *SocketServer::listen(void *arg){
@@ -135,7 +135,7 @@ void *SocketServer::listen(void *arg){
         for(;; y++)
             if(me->sockPtr->conn[y] == NULL) break;
         me->socketServer->connection[y] = new int(0);
-        me->socketServer->threadStorage[y] = new pthread_t();
+        me->socketServer->threadStorage[y] = (pthread_t*) malloc(sizeof(pthread_t));
         if (listenLS(me->socketServer->fd, 3) < 0)
             throw SocketException((char*)me->socketServer->me.c_str(), "Failed for listening deamon.", (char*)"Start failed", me->socketServer->port, 0x61);
         sleep(1);
@@ -146,13 +146,21 @@ void *SocketServer::listen(void *arg){
             SOCKET_REPORTING("New user connected\n");
         #endif
         me->connectionID = y;
-        me->socketServer->threadStorage[y] = new(pthread_t);
+        me->socketServer->threadStorage[y] = (pthread_t*) malloc(sizeof(pthread_t));
         if(me->socketServer->listener == nullptr){
             pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->listener, new throwNetAttr(me, me->connectionID));
             pthread_detach(*me->socketServer->threadStorage[y]);
             // printf("Func");
         }else{
-            pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->socketServer->listener->threadable, new throwNetAttr(me, me->connectionID, me->socketServer->listener));
+            // if(me->socketServer->listener->)
+            pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->socketServer->listener->Upthreadable, new throwNetAttr(me, me->connectionID, me->socketServer->listener));
+            pthread_detach(*me->socketServer->threadStorage[y]);
+            y++;
+            me->socketServer->connection[y] = new int(0);
+            me->socketServer->threadStorage[y] = (pthread_t*) malloc(sizeof(pthread_t));
+            //debug
+            // printf("%p\n", me->socketServer->threadStorage[y]);
+            pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->socketServer->listener->Downthreadable, new throwNetAttr(me, me->connectionID, me->socketServer->listener));
             pthread_detach(*me->socketServer->threadStorage[y]);
             // printf("Class");
         }
@@ -212,13 +220,17 @@ void NetworkListener::setListener(int type, void (*listener)(void *attr)){
 }
 
 std::string ___SockPTR___uniQED__::read(){
-    readLS(*conn[*cc-1], this->buffer, *this->bitrade);
-    if(buffer == NULL) throw(SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
+    char *tmp = new char[*this->bitrade];
+    readLS(*conn[*cc-1], tmp, *this->bitrade);
+    if(tmp == NULL) throw(SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
 becouse it's (or buffer) is NULL", (char*)"called from ___SockPTR::read() May be all sock-ptr struct was delted.", 71, -1));
-    return std::string((char*)(buffer));
+    free(tmp);
+    std::string str = tmp;
+    return str;
 }
 std::string ___SockPTR___uniQED__::read(int conn){
-    int sub = readLS(*this->conn[conn], this->buffer, *this->bitrade);
+    char *tmp = new char[*this->bitrade];
+    int sub = readLS(*this->conn[conn], tmp, *this->bitrade);
     if(sub == 0){
         throw SocketException("localhost", "Connection closed from other side", (char*)"discon, reading trial.", 60012, 0x71);
         //connection closerd
@@ -226,9 +238,10 @@ std::string ___SockPTR___uniQED__::read(int conn){
         throw SocketException("localhost", "Connection is exsistn't or busy", (char*)"notfound, reading trial.", 60012, 0x72);
         //connection already destroyed
     }
-    if(buffer == nullptr) throw(SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
+    if(tmp == nullptr) throw(SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
 becouse it's (or buffer) is NULL", (char*)"called from ___SockPTR::read(int conn). May be all sock-ptr struct was delted.", 71, -1));
-    std::string str = this->buffer;
+    std::string str = tmp;
+    free(tmp);
     return str;
 }
 int ___SockPTR___uniQED__::send(std::string data){
@@ -286,11 +299,33 @@ void *NetworkListener::threadable(void *arg){
             throw SocketException("localhost:server", "uncertain type of listeners", "You should take only DEFAULT_LISTENER or UPLOADS_LISTENER and DOWNLOAD_LISTENER", 0, SOCKEXC_UNCERTL);
     else if(me->listener->listeners.defaultListener != NULL)
         me->listener->listeners.defaultListener(arg);
-    else if(me->listener->listeners.upstream != NULL && me->listener->listeners.defaultListener != NULL){
+    else throw SocketException("localhost:server", "uncertain type of listeners", "You should take only DEFAULT_LISTENER or UPLOADS_LISTENER and DOWNLOAD_LISTENER", 241, SOCKEXC_UNCERTL);
+    return 0;
+}
+
+void *NetworkListener::Upthreadable(void *arg){
+    throwNetAttr *me = (throwNetAttr*)(arg);
+    if(me->listener->listeners.defaultListener != NULL &&\
+        me->listener->listeners.upstream != NULL &&\
+        me->listener->listeners.downstream != NULL)
+            throw SocketException("localhost:server", "uncertain type of listeners", "You should take only DEFAULT_LISTENER or UPLOADS_LISTENER and DOWNLOAD_LISTENER", 0, SOCKEXC_UNCERTL);
+    else if(me->listener->listeners.upstream != NULL){
         me->listener->listeners.upstream(arg);
+    }
+    else throw SocketException("localhost:server", "uncertain type of listeners", "You should take only DEFAULT_LISTENER or UPLOADS_LISTENER and DOWNLOAD_LISTENER", 241, SOCKEXC_UNCERTL);
+    return 0;
+}
+
+void *NetworkListener::Downthreadable(void *arg){
+    throwNetAttr *me = (throwNetAttr*)(arg);
+    if(me->listener->listeners.defaultListener != NULL &&\
+        me->listener->listeners.upstream != NULL &&\
+        me->listener->listeners.downstream != NULL)
+            throw SocketException("localhost:server", "uncertain type of listeners", "You should take only DEFAULT_LISTENER or UPLOADS_LISTENER and DOWNLOAD_LISTENER", 0, SOCKEXC_UNCERTL);
+    else if(me->listener->listeners.downstream != NULL){
         me->listener->listeners.downstream(arg);
-    }else
-        throw SocketException("localhost:server", "uncertain type of listeners", "You should take only DEFAULT_LISTENER or UPLOADS_LISTENER and DOWNLOAD_LISTENER", 0, SOCKEXC_UNCERTL);
+    }
+    else throw SocketException("localhost:server", "uncertain type of listeners", "You should take only DEFAULT_LISTENER or UPLOADS_LISTENER and DOWNLOAD_LISTENER", 241, SOCKEXC_UNCERTL);
     return 0;
 }
 
@@ -346,4 +381,7 @@ becouse it's is NULL", nullptr, 71, -1));
         //connection already destroyed
     }
     return sub;
+}
+bool NetworkListener::isMonolite(){
+    return this->listeners.defaultListener != NULL;
 }

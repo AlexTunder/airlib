@@ -15,20 +15,30 @@ char readingBuffer[1024]; //reading buffer
 int main(){
     for(int i = 0; i<1024; i++)
         readingBuffer[i] = 0;
-    listener.setListener(DEFAULT_LISTENER,[](void *attr){
-        HttpRequest answer;
+    listener.setListener(UPLOADS_LISTENER,[](void *attr){
         ListenerStream stream(attr); //Declare stream with connection
         stream.setBuffer(readingBuffer); //istall buffer for this stream
         try{ // try to do next:
             while (1){ //endless loop: this is active, when connection exist
                 stream.read(); //reading data
-                std::cout<<std::string(readingBuffer)<<std::endl; //display buffer
-                answer = configureAnswer("/README.md", "/home/alexthunder/hentai/globus/OpenCppNet/protocols/err", "/home/alexthunder/hentai/globus/OpenCppNet");
-                char aft[2048];
-                answer.flush(aft);
-                stream.send(aft); //send ALLOK string
             }
         }catch(SocketException e){ //if exception occuped
+            std::cout<<e.description<<"\n\tAddress:"<<e.address<<"\n\tPort:"<<e.port<<"\n\taDditional info:"<<e.additional<<"\n\tCode of error:"<<e.codeOfError; //if exception happen, it's display all info
+            if (e.codeOfError == SOCKEXC_DISCONN || e.codeOfError == SOCKEXC_BROKENP){ //if exception say about client disconnectiong
+                stream.close(); //close current stream & connection
+            }
+        }
+    });
+    listener.setListener(DOWNLOAD_LISTENER, [](void *raw){
+        ListenerStream stream(raw); //Declare stream with connection
+        stream.setBuffer(readingBuffer);
+        try{
+            while(1){
+                if(readingBuffer[0] != '\0'){
+                    stream.send("Hello world!");
+                }
+            }
+        }catch (SocketException e){
             std::cout<<e.description<<"\n\tAddress:"<<e.address<<"\n\tPort:"<<e.port<<"\n\taDditional info:"<<e.additional<<"\n\tCode of error:"<<e.codeOfError; //if exception happen, it's display all info
             if (e.codeOfError == SOCKEXC_DISCONN || e.codeOfError == SOCKEXC_BROKENP){ //if exception say about client disconnectiong
                 stream.close(); //close current stream & connection

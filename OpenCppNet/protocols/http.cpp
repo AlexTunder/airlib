@@ -2,26 +2,25 @@
 
 #ifndef HTTP_LIB
  #include <./http.hpp>
+ #include <sys/stat.h>
+ #include <sys/types.h>
 #endif
 #include <string.h>
 
+void slideFlag(char **arg, int from, int ignore){
+    int _ign = 0;
+    for(int i = from; _ign < ignore; i++){
+        if(arg[i+1] == NULL) _ign++;
+        arg[i] = arg[i+1];
+    }
+}
 void cpfrag(char *to, char *from, int size){
     for(int i = 0; i < size - 1; i++)
         to[i] = from[i];
 }
 
-char *readWord(char *from, char *separator, int __n = 0){
-    char *tmp = new char[strlen(from)], *sub;
-    strcpy(tmp, from);
-    sub = strtok(tmp, separator);
-    for(int i = 0; i < __n; i++){
-        sub = strtok(NULL, separator);
-    }
-    return sub;
-}
-
-char *readWord(char *from, const char *separator, int __n = 0){
-    char *tmp = new char[strlen(from)], *sub;
+char *readWord(const char *from, const char *separator, int __n = 0){
+    char *tmp = (char *)malloc(strlen(from)), *sub;
     strcpy(tmp, from);
     sub = strtok(tmp, separator);
     for(int i = 0; i < __n; i++){
@@ -57,13 +56,13 @@ HttpRequest configureAnswer(const char *file, const char *errpath, const char *r
     FILE *target = fopen(fn, "r");
     if(target == NULL){
         sub.setType((HttpRequestType)404);
-        char errorpath[64] = "";
-        strcpy(errorpath, errpath);
-        strcat(errorpath, "/404.html");
+        char errorpath[128];
+        sprintf(errorpath, "%s/404.html", errpath);
         target = fopen(errorpath, "r");
         if(target == NULL){
-            fclose(target);
-            throw HTTP_404_EX(HTTP_500_FN);
+            sub.setContent("<html><head><title>HTTP 500 error</title></head><body>Server fail: no 404.html file</body></html>");
+            sub.setType((HttpRequestType)(500));
+            throw HTTP_404_EX(errpath);
         }
         else{
             char __fread_404[HTTP_ERR_SZ];
@@ -104,6 +103,12 @@ void HttpRequest::setContent(const char *content){
     this->content = new char[strlen(content)+1];
     strcpy(this->content, content);
 }
+HttpRequest::HttpRequest(){
+    for(int i = 0; i < HTTP_MAX_ARG; i++){
+        this->fields[i] = NULL;
+        this->value[i] = NULL;
+    }
+}
 void HttpRequest::setType(HttpRequestType type){
     this->method = new char[64];
     if(type == HttpRequestType::GET){
@@ -125,9 +130,17 @@ void HttpRequest::setValue(const char *fieldname, const char *value){
     }
     
     int i = 0;
-    for(; this->fields[i] != NULL; i++);
-    this->fields[i] = new char[strlen(fieldname)];
-    this->value[i] = new char[strlen(value)];
+    for(; this->fields[i] != NULL; i++)
+        if(!strcmp(this->fields[i], fieldname)) break;
+    if(this->fields[i] == NULL){
+        this->fields[i] = new char[strlen(fieldname)];
+        this->value[i] = new char[strlen(value)];   
+    }else{
+        free(this->fields[i]);
+        this->fields[i] = (char *)malloc(strlen(fieldname));
+        free(this->value[i]);
+        this->value[i] = (char *)malloc(strlen(value));
+    }
     strcpy(fields[i], fieldname);
     strcpy(this->value[i], value);
 
@@ -169,10 +182,6 @@ void HttpRequest::operator=(HttpRequest req){
         strcpy(this->content, req.content);
     }
 }
-HttpRequest::HttpRequest(){
-    this->fields = new char *;
-    this->value = new char *;
-}
 char *HttpRequest::flush(char *to){
     char *__sub;
     if(to == NULL)
@@ -187,7 +196,7 @@ char *HttpRequest::flush(char *to){
         sprintf(__sub, "%s\n\n%s", __sub, this->content);
     return __sub;
 }
-void HttpRequest::fill(char *src){
+void HttpRequest::fill(const char *src){
     HttpRequestType rt;
     //Get 1st line
     char *tmp = new char[strlen(src)], *fl;
@@ -205,10 +214,10 @@ void HttpRequest::fill(char *src){
     //Get other arguments...
     char *thisLine, *val, *fn;
     for(int i = 1; ;i++){
-        thisLine = readWord(src, "\n", i);
+        thisLine = readWord(src, "\n\r", i);
         if(thisLine == NULL) break;
         fn = readWord(thisLine, ": ", 0);
-        val = readWord(thisLine, ": \n\0", 1);
+        val = readWord(thisLine, " \n\r\0", 1);
         this->setValue(fn, val);
     }
 }
@@ -222,4 +231,96 @@ HttpRequest configureRequest(const char *file, HttpRequestType rt, char *additio
         else
             throw HTTP_IRF_EX("Body of post is empty");
     return sub;
+}
+void HttpServerHandler::setRoot(const char *root){ //Enter full path
+    this->root = (char*)malloc(strlen(root));
+    strcpy(this->root, root);
+}
+void HttpServerHandler::setErrorPath(const char *dir){ //Enter full path
+    this->error = (char*)malloc(strlen(dir));
+    strcpy(this->error, dir);
+}
+void HttpServerHandler::setRoutineArg(const char *fieldname, const char *value){
+    int i = 0;
+    for(; this->routine_fn[i] != NULL; i++)
+        if(!strcmp(this->routine_fn[i], fieldname)) break;
+    if(this->routine_fn[i] == NULL){
+        this->routine_fn[i] = new char[strlen(fieldname)];
+        this->routine_vl[i] = new char[strlen(value)];   
+    }
+    strcpy(routine_fn[i], fieldname);
+    strcpy(this->routine_vl[i], value);
+}
+void HttpServerHandler::removeRoutine(const char *fieldname){
+    int i = 0;
+    for(; strcmp(this->routine_fn[i], fieldname) && this->routine_fn[i]!= NULL; i++);
+    if(!strcmp(this->routine_fn[i], fieldname)){
+        free(this->routine_fn[i]);
+        free(this->routine_vl[i]);
+        this->routine_fn[i] = NULL;
+        this->routine_vl[i] = NULL;
+        slideFlag(this->routine_vl, i, 0);
+        slideFlag(this->routine_fn, i, 0);
+    }
+}
+char *HttpServerHandler::flush(){
+    this->answer = configureAnswer(this->requests.getValue("$target"), this->error, this->root);
+    for(int i = 0; this->routine_fn[i] != NULL; i++){
+        this->answer.setValue(this->routine_fn[i], this->routine_vl[i]);
+    }
+    this->ready = 0;
+    return answer.flush();
+}
+void HttpServerHandler::fill(const char *src){
+    this->requests.fill(src);
+    this->ready = 1;
+}
+void HttpClientHandler::setRoutineArg(const char *fieldname, const char *value){
+    int i = 0;
+    for(; this->routine_fn[i] != NULL || !strcmp(this->routine_fn[i], fieldname); i++);
+    if(this->routine_fn[i] == NULL){
+        this->routine_fn[i] = new char[strlen(fieldname)];
+        this->routine_vl[i] = new char[strlen(value)];   
+    }
+    strcpy(routine_fn[i], fieldname);
+    strcpy(this->routine_vl[i], value);
+}
+void HttpClientHandler::removeRoutine(const char *fieldname){
+    int i = 0;
+    for(; strcmp(this->routine_fn[i], fieldname) && this->routine_fn[i]!= NULL; i++);
+    if(!strcmp(this->routine_fn[i], fieldname)){
+        free(this->routine_fn[i]);
+        free(this->routine_vl[i]);
+        this->routine_fn[i] = NULL;
+        this->routine_vl[i] = NULL;
+        slideFlag(this->routine_vl, i, 0);
+        slideFlag(this->routine_fn, i, 0);
+    }
+}
+HttpRequest HttpClientHandler::get(const char *file){
+    this->requests = configureRequest(file, HttpRequestType::GET, NULL);
+    return this->requests;
+}
+HttpRequest HttpClientHandler::head(const char *file){
+    this->requests = configureRequest(file, HttpRequestType::HEAD, NULL);
+    return this->requests;
+}
+HttpRequest HttpClientHandler::post(const char *file, const char *content){
+    this->requests = configureRequest(file, HttpRequestType::POST, (char*)content);
+    return this->requests;
+}
+HttpRequest HttpClientHandler::connect(const char *host){
+    this->requests = configureRequest(host, HttpRequestType::CONNECT, NULL);
+    return this->requests;
+}
+bool HttpServerHandler::isReady(){
+    if(this->ready){
+        this->ready = 0;
+        return 1;
+    }
+    else return 0;
+}
+HttpServerHandler::HttpServerHandler(){
+    this->routine_fn = new char*[32];
+    this->routine_vl = new char*[32];
 }

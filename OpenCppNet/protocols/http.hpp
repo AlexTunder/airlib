@@ -19,25 +19,27 @@
  #ifndef HTTP_BITRATE
   #define HTTP_BITRATE 3072
  #endif
-
+ #define HTTP_MAX_ARG 70
  #define HTTP 1.1
 
 enum HttpRequestType {
     GET = 0, POST, HEAD, CONNECT, ALLOK = 200, E404 = 404
 };
 
-class HttpServer;
-class HttpRequest;
-class HttpClient;
+//Exceptions
 class HttpException;
+//Data storage and processing
+class HttpRequest;
 
 class HttpRequest{
     //This class only contain and process data and requests.
     protected:
         char *method = NULL;
-        char **fields = NULL; char **value = NULL;
+        char **fields = new char*[HTTP_MAX_ARG]; char **value = new char*[HTTP_MAX_ARG];
         char *content = NULL;
     public:
+        HttpRequest();
+
         void operator=(HttpRequest req);
 
         char *getValue(const char *value);
@@ -46,35 +48,49 @@ class HttpRequest{
         char* getContent();
         void setType(HttpRequestType rt);
         HttpRequestType getType();
-        HttpRequest();
 
         char *flush(char *to = NULL);
-        void fill(char *src);
+        void fill(const char *src);
 };
 
 HttpRequest configureAnswer(const char *file, const char *errpath, const char *root);
 HttpRequest configureRequest(const char *file, HttpRequestType rt, char *additional = NULL);
 
-class HttpServer{
+class HttpServerHandler{
     //This class work with socket and fill 
     protected:
         char *root;
-        char *error_path;
+        char *error;
 
-        SocketServer *server;
-        HttpRequest request;
+        char **routine_fn, **routine_vl;
+
+        bool ready = 0;
+
     public:
-    //Low-level and settings
+        HttpServerHandler();
+        HttpRequest requests, answer;
         void setRoot(const char *root);
         void setErrorPath(const char *dir);
-    //Network only
-        void setup(SocketServer *server);
-        void setup();
-        void start();
+        char *sendError(HttpRequestType rt);
+        void setRoutineArg(const char *fieldname, const char *value);
+        void removeRoutine(const char *fieldname);
+        void fill(const char *src);
+        bool isReady();
+        char *flush();
 };
 
-class HttpClient{
+class HttpClientHandler{
+    protected:
+        char **routine_fn, **routine_vl;
 
+    public:
+        HttpRequest requests, answer;
+        void setRoutineArg(const char *fieldname, const char *value);
+        void removeRoutine(const char *fieldname);
+        HttpRequest get(const char *file);
+        HttpRequest head(const char *file);
+        HttpRequest post(const char *file, const char *content);
+        HttpRequest connect(const char *host);
 };
 
 #endif
