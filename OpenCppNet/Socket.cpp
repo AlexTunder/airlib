@@ -1,3 +1,4 @@
+#pragma once
 #ifndef SCFD
 #include "./Socket.hpp"
 #endif
@@ -353,6 +354,9 @@ void ListenerStream::send(std::string data){
 ListenerStream::ListenerStream(void *arg){
     this->attributes = (throwNetAttr*)(arg);
     std::cout << this->attributes->ptsd->sockPtr->fd << std::endl;
+    // this->attributes->mutualRes = new ;
+    // if(this->attributes->mutualRes == NULL)
+    //     this->attributes->mutualRes = (userInfo)malloc(sizeof(userInfo));
 }
 void ListenerStream::close(){
     (*(this->attributes->ptsd->sockPtr->cc))--;

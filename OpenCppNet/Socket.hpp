@@ -13,6 +13,7 @@
 #include <net/if.h>
 #include <iostream>
 #include <pthread.h>
+// #include </usr/include/>
 //Listeners
 #define DEFAULT_LISTENER        0
 #define UPLOADS_LISTENER        1
@@ -144,6 +145,7 @@ class SocketClient : public Socket{
 
 class throwNetAttr{
     public:
+        void *mutualRes = NULL;
         SocketServer::throwenSocketServerStruct *ptsd;
         int connID;
         NetworkListener *listener;
@@ -151,6 +153,7 @@ class throwNetAttr{
         throwNetAttr(SocketServer::throwenSocketServerStruct *attr, int conn, NetworkListener *listener);
 };
 
+// template <typename userInfo>
 class ListenerStream{
     private:
         throwNetAttr *attributes;
@@ -158,7 +161,13 @@ class ListenerStream{
     public:
         void close();
         int getCurrent();
+        // void setMutual(userInfo info){
+        //     (userInfo)(this->attributes->mutualRes) = info;
+        // }
         std::string read();
+        // userInfo *mutualRes(){
+        //     return (userInfo*)(this->attributes->mutualRes);
+        // }
         ListenerStream(void *arg);
         void send(std::string data);
         void setBuffer(char *buffer);

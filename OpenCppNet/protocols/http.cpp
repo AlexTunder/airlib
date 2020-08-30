@@ -171,10 +171,7 @@ void HttpRequest::operator=(HttpRequest req){
     strcpy(this->method, req.method);
     if(req.fields != NULL && *req.fields != NULL){
         for(int i = 0; req.fields[i] != NULL; i++){
-            this->fields[i] = new char(strlen(req.fields[i]));
-            this->value[i] = new char(strlen(req.value[i]));
-            strcpy(this->fields[i], req.fields[i]);
-            strcpy(this->value[i], req.value[i]);
+            this->setValue((const char*)req.fields, (const char*)req.value);
         }
     }
     if(req.content != NULL){
@@ -232,95 +229,33 @@ HttpRequest configureRequest(const char *file, HttpRequestType rt, char *additio
             throw HTTP_IRF_EX("Body of post is empty");
     return sub;
 }
-void HttpServerHandler::setRoot(const char *root){ //Enter full path
-    this->root = (char*)malloc(strlen(root));
-    strcpy(this->root, root);
-}
-void HttpServerHandler::setErrorPath(const char *dir){ //Enter full path
-    this->error = (char*)malloc(strlen(dir));
-    strcpy(this->error, dir);
-}
-void HttpServerHandler::setRoutineArg(const char *fieldname, const char *value){
+void HttpRequest::setVirtual(const char *fieldname, char *val){
     int i = 0;
-    for(; this->routine_fn[i] != NULL; i++)
-        if(!strcmp(this->routine_fn[i], fieldname)) break;
-    if(this->routine_fn[i] == NULL){
-        this->routine_fn[i] = new char[strlen(fieldname)];
-        this->routine_vl[i] = new char[strlen(value)];   
+    for(; this->fields[i] != NULL; i++)
+        if(!strcmp(this->fields[i], fieldname)) break;
+    if(this->fields[i] == NULL){
+        this->fields[i] = new char[strlen(fieldname)];
+        strcpy(this->fields[i], fieldname);
     }
-    strcpy(routine_fn[i], fieldname);
-    strcpy(this->routine_vl[i], value);
+    this->value[i] = val;
 }
-void HttpServerHandler::removeRoutine(const char *fieldname){
-    int i = 0;
-    for(; strcmp(this->routine_fn[i], fieldname) && this->routine_fn[i]!= NULL; i++);
-    if(!strcmp(this->routine_fn[i], fieldname)){
-        free(this->routine_fn[i]);
-        free(this->routine_vl[i]);
-        this->routine_fn[i] = NULL;
-        this->routine_vl[i] = NULL;
-        slideFlag(this->routine_vl, i, 0);
-        slideFlag(this->routine_fn, i, 0);
+void HttpRequest::clear(char what){
+    if(what == 1){
+        for(int i = 0; this->fields[i] != NULL; i++){
+            free(this->fields[i]);
+            free(this->value[i]);
+            this->value[i] = this->fields[i] = NULL;
+        }
+    }else if(what == 2){
+        free(this->content);
+        this->content = NULL;
+    }else if(what == 3){
+        free(this->content);
+        this->content = NULL;
+        for(int i = 0; this->fields[i] != NULL; i++){
+            free(this->fields[i]);
+            free(this->value[i]);
+            this->value[i] = this->fields[i] = NULL;
+        }
     }
-}
-char *HttpServerHandler::flush(){
-    this->answer = configureAnswer(this->requests.getValue("$target"), this->error, this->root);
-    for(int i = 0; this->routine_fn[i] != NULL; i++){
-        this->answer.setValue(this->routine_fn[i], this->routine_vl[i]);
-    }
-    this->ready = 0;
-    return answer.flush();
-}
-void HttpServerHandler::fill(const char *src){
-    this->requests.fill(src);
-    this->ready = 1;
-}
-void HttpClientHandler::setRoutineArg(const char *fieldname, const char *value){
-    int i = 0;
-    for(; this->routine_fn[i] != NULL || !strcmp(this->routine_fn[i], fieldname); i++);
-    if(this->routine_fn[i] == NULL){
-        this->routine_fn[i] = new char[strlen(fieldname)];
-        this->routine_vl[i] = new char[strlen(value)];   
-    }
-    strcpy(routine_fn[i], fieldname);
-    strcpy(this->routine_vl[i], value);
-}
-void HttpClientHandler::removeRoutine(const char *fieldname){
-    int i = 0;
-    for(; strcmp(this->routine_fn[i], fieldname) && this->routine_fn[i]!= NULL; i++);
-    if(!strcmp(this->routine_fn[i], fieldname)){
-        free(this->routine_fn[i]);
-        free(this->routine_vl[i]);
-        this->routine_fn[i] = NULL;
-        this->routine_vl[i] = NULL;
-        slideFlag(this->routine_vl, i, 0);
-        slideFlag(this->routine_fn, i, 0);
-    }
-}
-HttpRequest HttpClientHandler::get(const char *file){
-    this->requests = configureRequest(file, HttpRequestType::GET, NULL);
-    return this->requests;
-}
-HttpRequest HttpClientHandler::head(const char *file){
-    this->requests = configureRequest(file, HttpRequestType::HEAD, NULL);
-    return this->requests;
-}
-HttpRequest HttpClientHandler::post(const char *file, const char *content){
-    this->requests = configureRequest(file, HttpRequestType::POST, (char*)content);
-    return this->requests;
-}
-HttpRequest HttpClientHandler::connect(const char *host){
-    this->requests = configureRequest(host, HttpRequestType::CONNECT, NULL);
-    return this->requests;
-}
-bool HttpServerHandler::isReady(){
-    if(this->ready){
-        this->ready = 0;
-        return 1;
-    }
-    else return 0;
-}
-HttpServerHandler::HttpServerHandler(){
-    this->routine_fn = new char*[32];
-    this->routine_vl = new char*[32];
 }

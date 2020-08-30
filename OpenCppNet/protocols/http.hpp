@@ -12,7 +12,23 @@
 #include <string.h>
 #include <stdio.h>
 #ifndef SCFD
- #include "../Socket.hpp"
+    class SocketException{
+        public:
+            SocketException(const char *address, const char *description, const char *additional, int port, int code){
+                this->address = (char*)malloc(strlen(address));
+                strcpy(this->address, address);
+                this->description = (char*)malloc(strlen(description));
+                strcpy(this->description, description);
+                this->additional = (char*)malloc(strlen(additional));
+                strcpy(this->additional, additional);
+                this->port = port;
+                this->codeOfError = code;
+            }
+            char *address, *description, *additional;
+            int port, codeOfError;
+            bool operator==(SocketException e);
+            bool operator==(int codeOfException);
+    };
 #endif
 #ifndef HTTP_LIB
  #define HTTP_LIB 0x01a
@@ -30,6 +46,7 @@ enum HttpRequestType {
 class HttpException;
 //Data storage and processing
 class HttpRequest;
+class HttpHandler;
 
 class HttpRequest{
     //This class only contain and process data and requests.
@@ -42,8 +59,10 @@ class HttpRequest{
 
         void operator=(HttpRequest req);
 
+        void clear(char what); //0 - nothing, 1 - args only, 2 - content only, 3 - content and args
         char *getValue(const char *value);
         void setValue(const char *value, const char *name);
+        void setVirtual(const char *value, char *val);
         void setContent(const char *content);
         char* getContent();
         void setType(HttpRequestType rt);
@@ -51,47 +70,12 @@ class HttpRequest{
 
         char *flush(char *to = NULL);
         void fill(const char *src);
+
+
 };
 
 HttpRequest configureAnswer(const char *file, const char *errpath, const char *root);
 HttpRequest configureRequest(const char *file, HttpRequestType rt, char *additional = NULL);
-
-class HttpServerHandler{
-    //This class work with socket and fill 
-    protected:
-        char *root;
-        char *error;
-
-        char **routine_fn, **routine_vl;
-
-        bool ready = 0;
-
-    public:
-        HttpServerHandler();
-        HttpRequest requests, answer;
-        void setRoot(const char *root);
-        void setErrorPath(const char *dir);
-        char *sendError(HttpRequestType rt);
-        void setRoutineArg(const char *fieldname, const char *value);
-        void removeRoutine(const char *fieldname);
-        void fill(const char *src);
-        bool isReady();
-        char *flush();
-};
-
-class HttpClientHandler{
-    protected:
-        char **routine_fn, **routine_vl;
-
-    public:
-        HttpRequest requests, answer;
-        void setRoutineArg(const char *fieldname, const char *value);
-        void removeRoutine(const char *fieldname);
-        HttpRequest get(const char *file);
-        HttpRequest head(const char *file);
-        HttpRequest post(const char *file, const char *content);
-        HttpRequest connect(const char *host);
-};
 
 #endif
 #include "./http.cpp"
