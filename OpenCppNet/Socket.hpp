@@ -25,6 +25,7 @@
  #endif
 #else
  #define USE_PTHREAD
+ #include <pthread.h>
 #endif
 #include <stdio.h>
 #include <unistd.h> 
