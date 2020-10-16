@@ -3,7 +3,7 @@
 SocketServer server; //making server object
 
 NetworkListener listener; //declire connection listener
-
+ 
 //You also can use pointer to function like: void*(void*), so I should to write this below
 //I not recomend this method for setting listener. NetworkClass work better and it's have nice interface
 //for using pointer-to-function listener you have to know at least basic architecture of library
@@ -13,11 +13,11 @@ char readingBuffer[1024]; //reading buffer
 
 int main(){
     listener.setListener(DEFAULT_LISTENER,[](void *attr){
-        ListenerStream stream(attr); //Declare stream with connection
+        ListenerStream <int>stream(attr); //Declare stream with connection
         stream.setBuffer(readingBuffer); //istall buffer for this stream
         try{ // try to do next:
             while (1){ //endless loop: this is active, when connection exist
-                stream.read(); //reading data
+                stream.read(); //reading datas
                 std::cout<<std::string(readingBuffer)<<std::endl; //display buffer
                 stream.send("ALLOK"); //send ALLOK string
             }
@@ -31,7 +31,7 @@ int main(){
     try{ //try to start server
         std::cout<<server.setBitrade(1024)<<std::endl; //set a bitrade, print current bitrade (shoud be 1024)
         server.setBuffer(readingBuffer); //setting buffer
-        server.bind("127.0.0.1", 8000); //binding server in local host and 8000 port
+        server.bind("127.0.0.1", 12760); //binding server in local host and 8000 port
         server.start(&listener, 5); //start listening for clients. MAx. count of clients: 5
         while(1){
             // printf("current connections: %i\n", server.cc);

@@ -4,16 +4,16 @@
 #endif
 
 /** Basic socket interpritation **/
-int SSLLBC(int __fd, const sockaddr *__addr, socklen_t __len) throw(){
+int SSLLBC(int __fd, const sockaddr *__addr, long long __len) throw(){
     return bind (__fd, __addr, __len);
 }
 ssize_t readLS(int __fd, void *__buf, size_t __nbytes){
     return read(__fd, __buf, __nbytes);
 }
-ssize_t sendLS(int __fd, const void *__buf, size_t __n, int __flags){
+ssize_t sendLS(int __fd, const char *__buf, size_t __n, int __flags){
     return send(__fd, __buf, __n, __flags);
 }
-int connectLS(int __fd, const sockaddr *__addr, socklen_t __len){
+int connectLS(int __fd, const sockaddr *__addr, long long __len){
     return connect(__fd, __addr, __len);
 }
 int listenLS(int __fd, int __n){
@@ -101,22 +101,36 @@ int Socket::kill(int conn){
 
 SocketServer::SocketServer(){
     Socket();
-    this->threadStorage = new pthread_t*;
+    #ifndef __WIN32
+     this->threadStorage = new pthread_t*;
     pthread_mutexattr_init(&this->mutexattr);
     pthread_mutex_init(&this->mutex, &mutexattr);
+    #else
+     this->threadStorage = new HANDLE*;
+    #endif
 }
 int SocketServer::bind(std::string addr, int port, int protocol){
     this->buffer = new char[this->bitrade];
     this->me = addr;    this->port = port;
     fd = socket(AF_INET, protocol, 0);
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+    #ifndef __WIN32
+     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+    #else
+     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    #endif
     address.sin_family = AF_INET; 
     address.sin_addr.s_addr = INADDR_ANY; 
     address.sin_port = htons(port); 
     // this->arg.sockPtr = new ___SockPTR___uniQED__(this, 1);
+    #ifdef __WIN32
+    if(!SSLLBC(fd, (struct sockaddr *)&address, sizeof(address)))
+        throw(SocketException((char*)addr.c_str(), (char*)"Failed to bind server: Host not resolved\
+ or already in use.", "host already in use", port, -2));
+    #else
     if(SSLLBC(fd, (struct sockaddr *)&address, sizeof(address)))
         throw(SocketException((char*)addr.c_str(), (char*)"Failed to bind server: Host not resolved\
  or already in use.", "host already in use", port, -2));
+    #endif
     if (fd == 0)
         throw(SocketException((char*)addr.c_str(), (char*)"Failed to bind server: file description\
 is null.", "iternal error", port, -1));
@@ -125,9 +139,11 @@ is null.", "iternal error", port, -1));
 is null or not resolved.", "sockopt is invalid", port, -3));
     return(address.sin_port);
 }
-void *SocketServer::listen(void *arg){
+thread_routine_t SocketServer::listen(void *arg){
     throwenSocketServerStruct *me = (throwenSocketServerStruct*)(arg);
-    pthread_mutex_lock(&me->socketServer->mutex);
+    #ifndef __WIN32
+     pthread_mutex_lock(&me->socketServer->mutex);
+    #endif
     while(1){
         me = (throwenSocketServerStruct*)(arg);
         // if(me->socketServer->cc != -1)
@@ -136,45 +152,64 @@ void *SocketServer::listen(void *arg){
         for(;; y++)
             if(me->sockPtr->conn[y] == NULL) break;
         me->socketServer->connection[y] = new int(0);
-        me->socketServer->threadStorage[y] = (pthread_t*) malloc(sizeof(pthread_t));
+        #ifndef __WIN32
+         me->socketServer->threadStorage[y] = (pthread_t*) malloc(sizeof(pthread_t));
+        #else
+         me->socketServer->threadStorage[y] = (HANDLE*)malloc(sizeof(HANDLE));
+        #endif
         if (listenLS(me->socketServer->fd, 3) < 0)
             throw SocketException((char*)me->socketServer->me.c_str(), "Failed for listening deamon.", (char*)"Start failed", me->socketServer->port, 0x61);
         sleep(1);
         if ((me->socketServer->connection[y] = new int(accept(me->socketServer->fd, (struct sockaddr *)&me->socketServer->address,  
-                        (socklen_t*)&me->socketServer->al)))<0)
+                        (int*)&me->socketServer->al)))<0)
             throw SocketException((char*)me->socketServer->me.c_str(), "Failed for listening deamon.", (char*)"accept fail", me->socketServer->port, 0x61);
         #ifdef SOCKET_STDOUT_REPORTING
             SOCKET_REPORTING("New user connected\n");
         #endif
         me->connectionID = y;
-        me->socketServer->threadStorage[y] = (pthread_t*) malloc(sizeof(pthread_t));
+        me->socketServer->threadStorage[y] = (thread_t*) malloc(sizeof(thread_t));
         if(me->socketServer->listener == nullptr){
-            pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->listener, new throwNetAttr(me, me->connectionID));
-            pthread_detach(*me->socketServer->threadStorage[y]);
+            #ifdef USE_PTHREAD
+             pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->listener, new throwNetAttr(me, me->connectionID));
+             pthread_detach(*me->socketServer->threadStorage[y]);
+            #else
+             *me->socketServer->threadStorage[y] = CreateThread(NULL, 0, me->listener, new throwNetAttr(me, me->connectionID), 0, NULL);
+            #endif
             // printf("Func");
         }else{
             // if(me->socketServer->listener->)
+            #ifdef USE_PTHREAD
             pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->socketServer->listener->Upthreadable, new throwNetAttr(me, me->connectionID, me->socketServer->listener));
             pthread_detach(*me->socketServer->threadStorage[y]);
+            #else
+             *me->socketServer->threadStorage[y] = CreateThread(NULL, 0, me->listener, new throwNetAttr(me, me->connectionID), 0, NULL);
+            #endif
             y++;
             me->socketServer->connection[y] = new int(0);
-            me->socketServer->threadStorage[y] = (pthread_t*) malloc(sizeof(pthread_t));
-            //debug
-            // printf("%p\n", me->socketServer->threadStorage[y]);
-            pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->socketServer->listener->Downthreadable, new throwNetAttr(me, me->connectionID, me->socketServer->listener));
-            pthread_detach(*me->socketServer->threadStorage[y]);
-            // printf("Class");
+            me->socketServer->threadStorage[y] = (thread_t*)malloc(sizeof(thread_t));
+            #ifdef USE_PTHREAD
+             pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->socketServer->listener->Downthreadable, new throwNetAttr(me, me->connectionID, me->socketServer->listener));
+             pthread_detach(*me->socketServer->threadStorage[y]);
+            #else
+             *me->socketServer->threadStorage[y] = CreateThread(NULL, 0, me->listener, new throwNetAttr(me, me->connectionID), 0, NULL);
+            #endif
         }
         me->socketServer->cc++;
     }
-    pthread_mutex_unlock(&me->socketServer->mutex);
+    #ifdef USE_PTHREAD
+     pthread_mutex_unlock(&me->socketServer->mutex);
+    #endif
 }
-void SocketServer::start(void *(*listener)(void *arg), int maxClients){
+void SocketServer::start(thread_routine_t (*listener)(void *arg), int maxClients){
     this->arg = {this, listener};
 	this->arg.sockPtr = new ___SockPTR___uniQED__(___SockPTR___uniQED__(this, 1));
     this->state = 1;
+    #ifdef __USE_PTHREAD
     pthread_create(&mainThread, &attr, this->listen, &arg);
     pthread_detach(mainThread);
+    #else
+    this->mainThread = CreateThread(NULL, 0, this->listen, &arg, NULL, NULL);
+    #endif
 }
 void NetworkListener::Set___SockPTR___uniQED__(___SockPTR___uniQED__ *sockptr){
     this->listeners.arg = sockptr;
@@ -184,8 +219,12 @@ void SocketServer::start(NetworkListener *listener, int maxClients){
     this->listener = listener;
 	this->arg.sockPtr = new ___SockPTR___uniQED__(___SockPTR___uniQED__(this, 1));
     this->state = 1;
-    pthread_create(&mainThread, &attr, this->listen, &arg);
-    pthread_detach(mainThread);
+    #ifdef USE_PTHREAD
+     pthread_create(&mainThread, &attr, this->listen, &arg);
+     pthread_detach(mainThread);
+    #else
+     this->mainThread = CreateThread(NULL, 0, this->listen, &arg, NULL, NULL);
+    #endif
 }
 
 /** socket Client interface **/
@@ -196,9 +235,13 @@ int SocketClient::connect(std::string addr, int port, int protocol){
     fd = socket(AF_INET, protocol, 0);
     address.sin_family = AF_INET; 
     address.sin_port = htons(port); 
-    if(inet_pton(AF_INET, addr.c_str(), &address.sin_addr)<=0)
-        throw(SocketException((char*)addr.c_str(), "Failed to connect to server: Host not resolved\
+    #ifdef __WIN32
+     address.sin_addr.s_addr = inet_addr(addr.c_str());
+    #else
+     if(inet_pton(AF_INET, addr.c_str(), &address.sin_addr)<=0)
+         throw(SocketException((char*)addr.c_str(), "Failed to connect to server: Host not resolved\
  or already in use. Failed on settings stage.", nullptr, port, -1));
+    #endif
     if (connectLS(fd, (struct sockaddr *)&address, sizeof(address)) < 0)
         throw(SocketException((char*)addr.c_str(), "Failed to connect to server: Host not resolved\
  or already in use. Failing in connection stage.", nullptr, port, -2));
@@ -334,14 +377,17 @@ ___SockPTR___uniQED__ *getAttributes(void *pointer){
     return (___SockPTR___uniQED__*)(pointer);
 }
 
-void ListenerStream::setBuffer(char *buffer){
+template <typename mutualType>
+void ListenerStream<mutualType>::setBuffer(char *buffer){
     this->attributes->ptsd->sockPtr->setBuffer(buffer);
     this->buffer = buffer;
 }
-std::string ListenerStream::read(){
+template <typename mutualType>
+std::string ListenerStream<mutualType>::read(){
     return this->attributes->ptsd->sockPtr->read(this->attributes->connID);
 }
-void ListenerStream::send(std::string data){
+template <typename mutualType>
+void ListenerStream<mutualType>::send(std::string data){
     int sub = this->attributes->ptsd->sockPtr->send(data, this->attributes->connID);
     if(sub == 0){
         throw SocketException("localhost", "Connection closed from other side", (char*)"discon, sending trial", 60012, 0x71);
@@ -351,14 +397,16 @@ void ListenerStream::send(std::string data){
         //connection already destroyed
     }
 }
-ListenerStream::ListenerStream(void *arg){
+template <typename mutualType>
+ListenerStream<mutualType>::ListenerStream(void *arg){
     this->attributes = (throwNetAttr*)(arg);
     std::cout << this->attributes->ptsd->sockPtr->fd << std::endl;
-    // this->attributes->mutualRes = new ;
-    // if(this->attributes->mutualRes == NULL)
-    //     this->attributes->mutualRes = (userInfo)malloc(sizeof(userInfo));
+    //this->attributes->mutualRes = malloc(sizeof(mutualRed));
+    if(this->attributes->mutualRes == NULL)
+        this->attributes->mutualRes = malloc(sizeof(mutualType));
 }
-void ListenerStream::close(){
+template <typename mutualType>
+void ListenerStream<mutualType>::close(){
     (*(this->attributes->ptsd->sockPtr->cc))--;
     // sideTo(this->attributes->ptsd->sockPtr->conn, this->attributes->connID, *(this->attributes->ptsd->sockPtr->cc)+2);
     delete(this->attributes->ptsd->sockPtr->conn[this->getCurrent()]);
@@ -366,7 +414,8 @@ void ListenerStream::close(){
     this->attributes->ptsd->socketServer->threadStorage[this->getCurrent()] = NULL;
     this->attributes->ptsd->sockPtr->conn[this->getCurrent()] = NULL;
 }
-int ListenerStream::getCurrent(){
+template <typename mutualType>
+int ListenerStream<mutualType>::getCurrent(){
     return this->attributes->connID;
 }
 // int ___SockPTR__uniQED::close(int conn){

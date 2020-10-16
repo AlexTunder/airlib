@@ -1,28 +1,67 @@
 #pragma once
 #ifndef SCFD
 #define SCFD 1
+#ifdef __WIN32
+ #pragma comment(lib, "Ws2_32.lib")
+ #include <winsock.h>
+ #include <ws2tcpip.h>
+#else
+ #include <sys/types.h>
+ #include <sys/socket.h> 
+ #include <arpa/inet.h>
+ #include <sys/ioctl.h>
+ #include <net/if.h>
+#endif
+#ifdef __WIN32
+ #ifndef USE_PTHREAD
+  #include <windows.h>
+ #else
+  #ifndef __WIN32_pthread
+   #error Windows dousen't support arch for pthread or pthread.h is not included
+  #elif __WIN32
+   #warning POSIX thread is ported for windows, so some functions can works wrong
+   #include <pthread.h>
+  #endif
+ #endif
+#else
+ #define USE_PTHREAD
+#endif
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h> 
-#include <arpa/inet.h> 
 #include <unistd.h> 
 #include <stdio.h>
 #include <string.h> 
 #include <string>
-#include <sys/ioctl.h>
-#include <net/if.h>
 #include <iostream>
-#include <pthread.h>
-// #include </usr/include/>
+//Global Directives
+#ifdef __WIN32
+ //Directives only for MS Windows
+ #ifndef __WIN32_pthread
+  #define LAMBDA_THREAD_END DWORD       //it's mean, what return code for thread is DWORD (aka long(32))
+ #else
+  #define LAMBDA_THREAD_END void*
+ #endif
+ #define THREADING_ARCH HANDLE
+#else
+ //Only for Unix-like (or other POSIX-based systems)
+ #define LAMBDA_THREAD_END (void*)
+ #define THREADING_ARCH pthread_t
+#endif
 //Listeners
-#define DEFAULT_LISTENER        0
-#define UPLOADS_LISTENER        1
-#define DOWNLOAD_LISTENER       2
+#define DEFAULT_LISTENER        0x00 //Echo   Network Thread
+#define UPLOADS_LISTENER        0x01 //First  Network Thread
+#define DOWNLOAD_LISTENER       0x02 //Second Network Thread
 //Exception codes
-#define SOCKEXC_DISCONN         0x71
-#define SOCKEXC_BROKENP         0x72
-#define SOCKEXC_TIMEOUT         0x73
-#define SOCKEXC_UNCERTL         0x81
+#define SOCKEXC_DISCONN         0x71 //Connection refused: closed from other side
+#define SOCKEXC_BROKENP         0x72 //Connection refused: closed or broken
+#define SOCKEXC_TIMEOUT         0x73 //Connection refused: time out
+#define SOCKEXC_ALINUSE         0x81 //Failed to bind server: already in use
+#define SOCKEXC_ARCHUNS         0x12 //OS arch is unsupport
+#define SOCKEXC_UNCERTL         0x63 //Wrong listener list: one or more listeners is conflicting
+#define SOCKEXC_ITERNAL         0x82 //Iternal error excite exception. in additional info taken struct with all info
+//Listeners return codes
+#define endListener         return(LAMBDA_THREAD_END)
+#define thread_routine_t    LAMBDA_THREAD_END
+#define thread_t            THREADING_ARCH
 
 class Socket{
     public:
@@ -31,7 +70,8 @@ class Socket{
         char *buffer;
         int bitrade;
         struct sockaddr_in address; 
-        int fd, **connection, opt, cc;
+        int fd, **connection, cc;
+        char opt;
         size_t al = sizeof(address);
         /** Communicate with connection **/
         std::string read();
@@ -90,25 +130,31 @@ class SocketServer : public Socket{
         // ... давать сразу поинтер на сам сервер или кллиент.
         struct throwenSocketServerStruct{
             SocketServer *socketServer = nullptr;
+            #ifndef __WIN32
             void *(*listener)(void *arg);
+            #else
+             thread_routine_t (*listener)(void *arg);
+            #endif
             int connectionID;
             ___SockPTR___uniQED__ *sockPtr = nullptr;
         };
         /*** Yet I should to use this structure, becouse it's have dependes ***/
         int bind(std::string addr, int port, int protocol = SOCK_STREAM);
-        void start(void *(*listener)(void *arg), int maxClients);
+        void start(thread_routine_t (*listener)(void *arg), int maxClients);
         void start(NetworkListener *listener, int maxClients);
         struct throwenSocketServerStruct arg;
-        static void *listen(void *arg);
-        pthread_t **threadStorage;
+        static thread_routine_t listen(void *arg);
+        thread_t **threadStorage;
+        thread_t mainThread;
+        #ifdef USE_PTHREAD
+         pthread_attr_t attr;
+         pthread_mutex_t mutex;
+         pthread_mutexattr_t mutexattr;
+        #endif
         NetworkListener *listener; //Стоило бы убрать и сделать что то другое
         int port; std::string me;
-        pthread_t mainThread;
-        pthread_attr_t attr;
         SocketServer();
         int state = 0;
-        pthread_mutex_t mutex;
-        pthread_mutexattr_t mutexattr;
 };
 
 // template <typename tn>
@@ -153,7 +199,7 @@ class throwNetAttr{
         throwNetAttr(SocketServer::throwenSocketServerStruct *attr, int conn, NetworkListener *listener);
 };
 
-// template <typename userInfo>
+template <typename userInfo>
 class ListenerStream{
     private:
         throwNetAttr *attributes;
@@ -161,13 +207,13 @@ class ListenerStream{
     public:
         void close();
         int getCurrent();
-        // void setMutual(userInfo info){
-        //     (userInfo)(this->attributes->mutualRes) = info;
-        // }
+        void setMutual(userInfo info){
+            (userInfo)(this->attributes->mutualRes) = info;
+        }
         std::string read();
-        // userInfo *mutualRes(){
-        //     return (userInfo*)(this->attributes->mutualRes);
-        // }
+        userInfo *mutualRes(){
+            return (userInfo*)(this->attributes->mutualRes);
+        }
         ListenerStream(void *arg);
         void send(std::string data);
         void setBuffer(char *buffer);
