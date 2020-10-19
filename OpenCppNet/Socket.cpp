@@ -77,6 +77,8 @@ SocketException::SocketException(const char *address, const char *description, c
     this->codeOfError = code;
 }
 Socket::Socket(){
+    if(WSAStartup(MAKEWORD(2,2), &this->wsa) != NO_ERROR)
+        throw SocketException("Operating system arch", "Failed to setup WSA data", (char*)&this->wsa, SOCKEXC_ARCHERR, SOCKEXC_ARCHERR); 
     connection = new int*;
     bitrade = 0;
 }
@@ -109,27 +111,30 @@ SocketServer::SocketServer(){
      this->threadStorage = new HANDLE*;
     #endif
 }
-int SocketServer::bind(std::string addr, int port, int protocol){
+int SocketServer::bind(std::string addr, int port, int protocol, long additionalFlags){
     this->buffer = new char[this->bitrade];
     this->me = addr;    this->port = port;
-    fd = socket(AF_INET, protocol, 0);
+    fd = socket(AF_INET, protocol, IPPROTO_TCP);
     #ifndef __WIN32
      setsockopt(fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
     #else
-     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+     setsockopt(fd, SOL_SOCKET, additionalFlags, &opt, sizeof(opt));
     #endif
     address.sin_family = AF_INET; 
     address.sin_addr.s_addr = INADDR_ANY; 
     address.sin_port = htons(port); 
     // this->arg.sockPtr = new ___SockPTR___uniQED__(this, 1);
+    char exitCode = 0;
     #ifdef __WIN32
-    if(!SSLLBC(fd, (struct sockaddr *)&address, sizeof(address)))
+    if((exitCode = SSLLBC(fd, (struct sockaddr *)&address, sizeof(address)))==SOCKET_ERROR){
+        exitCode = WSAGetLastError();
         throw(SocketException((char*)addr.c_str(), (char*)"Failed to bind server: Host not resolved\
- or already in use.", "host already in use", port, -2));
+ or already in use.", (char*)exitCode, port, -2));
+    }
     #else
-    if(SSLLBC(fd, (struct sockaddr *)&address, sizeof(address)))
+    if((exitCode = SSLLBC(fd, (struct sockaddr *)&address, sizeof(address))))
         throw(SocketException((char*)addr.c_str(), (char*)"Failed to bind server: Host not resolved\
- or already in use.", "host already in use", port, -2));
+ or already in use.", &exitCode, port, -2));
     #endif
     if (fd == 0)
         throw(SocketException((char*)addr.c_str(), (char*)"Failed to bind server: file description\
@@ -152,11 +157,7 @@ thread_routine_t SocketServer::listen(void *arg){
         for(;; y++)
             if(me->sockPtr->conn[y] == NULL) break;
         me->socketServer->connection[y] = new int(0);
-        #ifndef __WIN32
-         me->socketServer->threadStorage[y] = (pthread_t*) malloc(sizeof(pthread_t));
-        #else
-         me->socketServer->threadStorage[y] = (HANDLE*)malloc(sizeof(HANDLE));
-        #endif
+        me->socketServer->threadStorage[y] = (thread_t*)malloc(sizeof(thread_t));\
         if (listenLS(me->socketServer->fd, 3) < 0)
             throw SocketException((char*)me->socketServer->me.c_str(), "Failed for listening deamon.", (char*)"Start failed", me->socketServer->port, 0x61);
         sleep(1);
@@ -242,7 +243,7 @@ int SocketClient::connect(std::string addr, int port, int protocol){
          throw(SocketException((char*)addr.c_str(), "Failed to connect to server: Host not resolved\
  or already in use. Failed on settings stage.", nullptr, port, -1));
     #endif
-    if (connectLS(fd, (struct sockaddr *)&address, sizeof(address)) < 0)
+    if (connectLS(fd, (struct sockaddr *)&address, sizeof(address)) != SOCKET_ERROR)
         throw(SocketException((char*)addr.c_str(), "Failed to connect to server: Host not resolved\
  or already in use. Failing in connection stage.", nullptr, port, -2));
     connection[0] = &fd;
@@ -418,10 +419,6 @@ template <typename mutualType>
 int ListenerStream<mutualType>::getCurrent(){
     return this->attributes->connID;
 }
-// int ___SockPTR__uniQED::close(int conn){
-//     this->conn[conn] = NULL;
-//     *this->cc = conn;
-// }
 int SocketClient::read(){
     int sub = readLS(*connection[cc-1], buffer, this->bitrade);
     if(buffer == NULL) throw(SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \

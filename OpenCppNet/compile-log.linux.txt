@@ -1,0 +1,79 @@
+LOG #0f56lc14ffffacaa1004d2e7
+In file included from echoServerExample.cpp:1:
+./Socket.hpp:20:25: warning: missing terminating ' character
+#error Windows dousen't support arch for pthread or pthread.h is not included
+^
+In file included from echoServerExample.cpp:1:
+./Socket.hpp:46:28: error: expected identifier before '(' token
+#define LAMBDA_THREAD_END (void*)
+^
+./Socket.hpp:63:29: note: in expansion of macro 'LAMBDA_THREAD_END'
+#define thread_routine_t LAMBDA_THREAD_END
+^~~~~~~~~~~~~~~~~
+./Socket.hpp:143:20: note: in expansion of macro 'thread_routine_t'
+void start(thread_routine_t (*listener)(void *arg), int maxClients);
+^~~~~~~~~~~~~~~~
+In file included from echoServerExample.cpp:1:
+./Socket.hpp:143:37: error: expected ',' or '...' before '(' token
+void start(thread_routine_t (*listener)(void *arg), int maxClients);
+^
+In file included from echoServerExample.cpp:1:
+./Socket.hpp:46:29: error: expected unqualified-id before 'void'
+#define LAMBDA_THREAD_END (void*)
+^~~~
+./Socket.hpp:63:29: note: in expansion of macro 'LAMBDA_THREAD_END'
+#define thread_routine_t LAMBDA_THREAD_END
+^~~~~~~~~~~~~~~~~
+./Socket.hpp:146:16: note: in expansion of macro 'thread_routine_t'
+static thread_routine_t listen(void *arg);
+^~~~~~~~~~~~~~~~
+./Socket.hpp:46:29: error: expected ')' before 'void'
+#define LAMBDA_THREAD_END (void*)
+~^~~~
+./Socket.hpp:63:29: note: in expansion of macro 'LAMBDA_THREAD_END'
+#define thread_routine_t LAMBDA_THREAD_END
+^~~~~~~~~~~~~~~~~
+./Socket.hpp:146:16: note: in expansion of macro 'thread_routine_t'
+static thread_routine_t listen(void *arg);
+^~~~~~~~~~~~~~~~
+./Socket.hpp:46:29: error: expected unqualified-id before 'void'
+#define LAMBDA_THREAD_END (void*)
+^~~~
+./Socket.hpp:63:29: note: in expansion of macro 'LAMBDA_THREAD_END'
+#define thread_routine_t LAMBDA_THREAD_END
+^~~~~~~~~~~~~~~~~
+./Socket.cpp:142:1: note: in expansion of macro 'thread_routine_t'
+thread_routine_t SocketServer::listen(void *arg){
+^~~~~~~~~~~~~~~~
+./Socket.hpp:46:29: error: expected ')' before 'void'
+#define LAMBDA_THREAD_END (void*)
+~^~~~
+./Socket.hpp:63:29: note: in expansion of macro 'LAMBDA_THREAD_END'
+#define thread_routine_t LAMBDA_THREAD_END
+^~~~~~~~~~~~~~~~~
+./Socket.cpp:142:1: note: in expansion of macro 'thread_routine_t'
+thread_routine_t SocketServer::listen(void *arg){
+^~~~~~~~~~~~~~~~
+In file included from ./Socket.hpp:229,
+from echoServerExample.cpp:1:
+./Socket.cpp:203:25: error: variable or field 'start' declared void
+void SocketServer::start(thread_routine_t (*listener)(void *arg), int maxClients){
+^
+./Socket.cpp:203:45: error: 'listener' was not declared in this scope
+void SocketServer::start(thread_routine_t (*listener)(void *arg), int maxClients){
+^~~~~~~~
+./Socket.cpp:203:45: note: suggested alternative: 'listenLS'
+void SocketServer::start(thread_routine_t (*listener)(void *arg), int maxClients){
+^~~~~~~~
+listenLS
+./Socket.cpp:203:55: error: expected primary-expression before 'void'
+void SocketServer::start(thread_routine_t (*listener)(void *arg), int maxClients){
+^~~~
+./Socket.cpp:203:67: error: expected primary-expression before 'int'
+void SocketServer::start(thread_routine_t (*listener)(void *arg), int maxClients){
+^~~
+./Socket.cpp: In member function 'void SocketServer::start(NetworkListener*, int)':
+./Socket.cpp:223:47: error: 'class SocketServer' has no member named 'listen'; did you mean 'listener'?
+pthread_create(&mainThread, &attr, this->listen, &arg);
+^~~~~~
+listener
