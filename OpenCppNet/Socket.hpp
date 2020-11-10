@@ -1,9 +1,11 @@
 #pragma once
 #ifndef SCFD
-#define SCFD 1
+#define SCFD "0.0.8"
 #ifdef __WIN32
+ #define WIN32_LEAN_AND_MEAN
  #pragma comment(lib, "ws2_32.lib")
  #include <winsock.h>
+ #include <ws2tcpip.h>
  #include <ws2tcpip.h>
 #else
  #include <sys/types.h>
@@ -33,6 +35,7 @@
 #include <string.h> 
 #include <string>
 #include <iostream>
+#include <vector>
 //Global Directives
 #ifdef __WIN32
  //Directives only for MS Windows
@@ -52,16 +55,28 @@
 #define UPLOADS_LISTENER        0x01 //First  Network Thread
 #define DOWNLOAD_LISTENER       0x02 //Second Network Thread
 //Exception codes
-#define SOCKEXC_DISCONN         0x71 //Connection refused: closed from other side
-#define SOCKEXC_BROKENP         0x72 //Connection refused: closed or broken
-#define SOCKEXC_TIMEOUT         0x73 //Connection refused: time out
-#define SOCKEXC_ALINUSE         0x81 //Failed to bind server: already in use
-#define SOCKEXC_ARCHUNS         0x12 //OS arch is unsupported
-#define SOCKEXC_UNCERTL         0x63 //Wrong listener list: one or more listeners is conflicting
-#define SOCKEXC_ITERNAL         0x82 //Iternal error excite exception. in additional info taken struct with all info
-#define SOCKEXC_ARCHERR         0x13 //OS unique error
+// 1X - Any side, runtime error or warning (user's algorithm call some exceptions)
+// 2X - Any side, settings or using error
+// 3X - Any side, Iternel errors (architecture fail)
+// 4X - Any side, Called from outside
+// 5X - Any side, Preparing stage fail
+// 7X - Any side, while connection is active
+// 8X - Server fail
+// 9X - Client fail
+// Additional codes:
+// 
+#define SOCKEXC_DISCONN         0x70 //Connection refused: closed from other side
+#define SOCKEXC_BROKENP         0x71 //Connection refused: closed or broken
+#define SOCKEXC_TIMEOUT         0x72 //Connection refused: time out
+#define SOCKEXC_ALINUSE         0x80 //Failed to bind server: already in use
+#define SOCKEXC_ARCHUNS         0x50 //OS arch is unsupported
+#define SOCKEXC_UNCERTL         0x20 //Wrong listener list: one or more listeners is conflicting
+#define SOCKEXC_ITERNAL         0x30 //Iternal error excite exception. in additional info taken struct with all info
+#define SOCKEXC_ARCHERR         0x31 //OS unique error
+#define SOCKEXC_RESOLVE         0x91 //Connection denied: host not found or not resolved
+#define SOCKEXC_NOFILED         0x32 //No file description for socket
 //Listeners return codes
-#define endListener         return(LAMBDA_THREAD_END)   // type endListener(); for break listener's loop
+#define endStream(x)        return(LAMBDA_THREAD_END(x))// type endStream(exit code); for break listener's loop
 #define thread_routine_t    LAMBDA_THREAD_END           // type of poiner to function for thread
 #define thread_t            THREADING_ARCH              // type of thread
 
@@ -76,7 +91,8 @@ class Socket{
         char *buffer;
         int bitrade;
         struct sockaddr_in address; 
-        int fd, **connection, cc;
+        int fd, cc;
+        std::vector <int*> connection;
         char opt;
         size_t al = sizeof(address);
         /** Communicate with connection **/
@@ -97,7 +113,7 @@ class ___SockPTR___uniQED__{
     public:
         ___SockPTR___uniQED__(void *client, bool isServer);
         int *fd;
-        int **conn;
+        std::vector <int*> conn;
         int *cc;
         int *bitrade;
         char *buffer;
@@ -116,11 +132,14 @@ class ___SockPTR___uniQED__{
 
 class SocketException{
     public:
-        SocketException(const char *address, const char *description, const char *additional, int port, int code);
+        SocketException(const char *address, const char *description, const char *additional, int port, int code, int additionalCode = -1);
         char *address, *description, *additional;
-        int port, codeOfError;
+        int port, codeOfError, additionalCode;
         bool operator==(SocketException e);
         bool operator==(int codeOfException);
+
+        void print(); //default print if exception occupted
+        void call(); //same as print() but stop programm after finish
 };
 
 SocketException SockTimeOut("", "Time for connection is out.", "", 0, SOCKEXC_TIMEOUT);
@@ -146,7 +165,7 @@ class SocketServer : public Socket{
         void start(NetworkListener *listener, int maxClients);
         struct throwenSocketServerStruct arg;
         static thread_routine_t listen(void *arg);
-        thread_t **threadStorage;
+        std::vector <thread_t *> threadStorage;
         thread_t mainThread;
         #ifdef USE_PTHREAD
          pthread_attr_t attr;
@@ -156,12 +175,11 @@ class SocketServer : public Socket{
         NetworkListener *listener; //Стоило бы убрать и сделать что то другое
         int port; std::string me;
         SocketServer();
-        int state = 0;
 };
 
 // template <typename tn>
 class NetworkListener{
-    private:
+    protected:
         struct listenersStruct{
             ___SockPTR___uniQED__ *arg;
             void (*downstream)(void *arg) = NULL; //If double-stream enable use as download stream and write data to buffer
@@ -170,6 +188,7 @@ class NetworkListener{
         }listeners;
         void *(*mainListener)(void *parg);
     public:
+        int timeout;
         bool isMonolite();
         static void *threadable(void *arg);
         static void *Upthreadable(void *arg);
@@ -179,7 +198,7 @@ class NetworkListener{
         
         //Work like low-level read() and send(), but have timeout (default = 1000ms)
         //If time out throw SocketException (TimeOutException)
-        //IT's will work in 0.0.8
+        //IT's will work in 0.0.9
         void sendRequest(const char *data);
         char *readRequest();
 };
@@ -203,14 +222,18 @@ class throwNetAttr{
 
 template <typename userInfo>
 class ListenerStream{
-    private:
+    protected:
         throwNetAttr *attributes;
         char *buffer;
     public:
         void close();
         int getCurrent();
         void setMutual(userInfo info){
-            (userInfo)(this->attributes->mutualRes) = info;
+            if(this->attributes->mutualRes == NULL) this->attributes->mutualRes = malloc(sizeof(userInfo));
+            *((userInfo*)(this->attributes->mutualRes)) = info;
+        }
+        void setMutual(userInfo *info){
+            this->attributes->mutualRes = info;
         }
         std::string read();
         userInfo *mutualRes(){
@@ -227,6 +250,7 @@ void anonimusDecode(char*, char*);
 ___SockPTR___uniQED__* getSockPointerFromAttr(SocketServer::throwenSocketServerStruct *attr);
 
 #define netServerAttribures SocketServer::throwenSocketServerStruct
-#define NetworkAttributes ___SockPTR___uniQED__ 
-#include "Socket.cpp"
+#define NetworkAttributes ___SockPTR___uniQED__ \
+ #ifndef SCFD_bin
+  #include "Socket.cpp"
 #endif
