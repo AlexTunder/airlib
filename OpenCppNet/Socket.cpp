@@ -3,6 +3,34 @@
 #include "./Socket.hpp"
 #endif
 
+#ifdef __WIN32
+int ExceptionCodeFromWSA(int wsa){
+    switch(wsa){
+        case WSA_INVALID_HANDLE:
+            return SOCKEXC_NOENMEM;
+        case WSA_NOT_ENOUGH_MEMORY:
+            return SOCKEXC_NOENMEM;
+        case WSA_INVALID_PARAMETER:
+            return SOCKEXC_OSINPAR;
+        case WSA_OPERATION_ABORTED:
+            return SOCKEXC_WSAEACC;
+        case WSA_IO_INCOMPLETE:
+            return SOCKEXC_IOINCOM;
+        case WSA_IO_PENDING:
+            return SOCKEXC_WSAIOIN;
+        case WSAEINTR:
+            return SOCKEXC_WSAINTR;
+        case WSAEBADF:
+            return SOCKEXC_WSAEBAD;
+        case WSAEACCES:
+            return SOCKEXC_WSAEACC;
+    }
+}
+char *WSAToStr(int excCode){
+
+}
+#endif
+
 /** Basic socket interpritation **/
 int SSLLBC(int __fd, const sockaddr *__addr, long long __len) throw(){
     return bind (__fd, __addr, __len);
@@ -34,28 +62,36 @@ int sideTo(int **array, int start, int end){
 
 /** Basic socket interface **/
 int Socket::send(std::string data){
-    return sendLS(*connection[cc-1], data.c_str(), this->bitrade, 0);
+    return sendLS(connection[cc-1].conn, data.c_str(), this->bitrade, 0);
 }
 int Socket::send(std::string data, int conn){
-    return sendLS(*connection[conn], data.c_str(), this->bitrade, 0);
+    return sendLS(connection[conn].conn, data.c_str(), this->bitrade, 0);
 }
 std::string Socket::read(){
-    int sub = readLS(*connection[cc-1], buffer, this->bitrade);
+    int sub = readLS(connection[cc-1].conn, buffer, this->bitrade);
     if(buffer == NULL) throw(SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
 becouse it's is NULL", nullptr, 71, -1));
+    #ifndef __WIN32
     if(sub == 0){
-        throw SocketException("localhost", "Connection closed from other side", (char*)"discon", 60012, 0x71);
+        SocketException("localhost", "Connection closed from other side", (char*)"discon", 60012, 0x71).call();
         //connection closerd
     }else if(sub < 0){
-        throw SocketException("localhost", "Connection is exsistn't or busy", (char*)"notfound", 60012, 0x72);
+        SocketException("localhost", "Connection is exsistn't or busy", (char*)"notfound", 60012, 0x72).call();
         //connection already destroyed
     }
+    #else
+    if(sub != SOCKET_ERROR){
+        int lastCode = WSAGetLastError();
+        SocketException("localhost", WSAToStr(ExceptionCodeFromWSA(lastCode)), "called from read func.", 60012, ExceptionCodeFromWSA(lastCode)).call();
+    }
+    #endif
     else return std::string(buffer); // connection active
 }
 std::string Socket::read(int conn){
-    int sub = readLS(*connection[conn], buffer, this->bitrade);
+    int sub = readLS(connection[conn].conn, buffer, this->bitrade);
     if(buffer == NULL) throw(SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
 becouse it's is NULL", nullptr, 71, -1));
+    #ifndef __WIN32
     if(sub == 0){
         throw SocketException("localhost", "Connection closed from other side", (char*)"discon", 60012, 0x71);
         //connection closerd
@@ -63,6 +99,12 @@ becouse it's is NULL", nullptr, 71, -1));
         throw SocketException("localhost", "Connection is exsistn't or busy", (char*)"notfound", 60012, 0x72);
         //connection already destroyed
     }
+    #else
+    if(sub != SOCKET_ERROR){
+        int lastCode = WSAGetLastError();
+        SocketException("localhost", WSAToStr(ExceptionCodeFromWSA(lastCode)), "called from read func.", 60012, ExceptionCodeFromWSA(lastCode)).call();
+    }
+    #endif
     return std::string((char*)(buffer));
 }
 SocketException::SocketException(const char *address, const char *description, const char *additional, int port, int code, int additionalCode){
@@ -105,12 +147,9 @@ int Socket::setBitrade(int bitrade){
     return this->bitrade;
 }
 int Socket::kill(int conn){
-    this->connection.erase(connection.begin()+conn);
+    this->connection[conn].remove();
     return 0;
 }
-// int Socket::stop(int conn){
-
-// }
 
 /** socket Server interface **/
 
@@ -151,9 +190,9 @@ int SocketServer::bind(std::string addr, int port, int protocol, long additional
     if (fd == 0)
     #else
     if (fd == INVALID_SOCKET)
+    #endif
         SocketException((char*)addr.c_str(), (char*)"Failed to bind server: file description\
 is null.", "iternal error", port, -1).call();
-    #endif
     if(opt < 0)
         SocketException((char*)addr.c_str(), (char*)"Failed to bind server: socket options\
 is null or not resolved.", "sockopt is invalid", port, -3).call();
@@ -174,9 +213,17 @@ thread_routine_t SocketServer::listen(void *arg){
         // for(;me->sockPtr->conn[y] != NULL; y++)
         //     printf("%i connection is busy\n", y);
         // printf("Wait for connection on [%i] slot\n", y);
-        me->socketServer->connection.push_back(0);
-        me->socketServer->threadStorage.push_back((thread_t*)malloc(sizeof(thread_t)));
-        int y = me->socketServer->connection.size();
+
+        // me->socketServer->connection.push_back(0);
+        // me->socketServer->threadStorage.push_back((thread_t*)malloc(sizeof(thread_t)));
+        // int y = me->socketServer->connection.size();
+
+        int y = 0;
+
+        if(!me->socketServer->connection.full()) 
+            y = me->socketServer->connection.insert(0, 0);
+        else y = me->socketServer->connection.append(0, 0);
+
         #ifndef __WIN32
         if (errcode = listenLS(me->socketServer->fd, 3) < 0)
         #else
@@ -190,39 +237,42 @@ thread_routine_t SocketServer::listen(void *arg){
                         (int*)&me->socketServer->al)))<0)
         #else
         int sub = accept(me->socketServer->fd, (struct sockaddr *)&me->socketServer->address, (int*)&me->socketServer->al);
-        if ((me->socketServer->connection[y] = new int(accept(me->socketServer->fd, (struct sockaddr *)&me->socketServer->address,  
-                        (int*)&me->socketServer->al)))!=NULL && sub == INVALID_SOCKET)
+        if ((me->socketServer->connection[y].conn = accept(me->socketServer->fd, (struct sockaddr *)&me->socketServer->address,  
+                        (int*)&me->socketServer->al)) != 0 && sub == INVALID_SOCKET)
         #endif
             SocketException((char*)me->socketServer->me.c_str(), "Failed for listening deamon.", (char*)"accept fail", me->socketServer->port, SOCKEXC_ITERNAL, errcode).call();
         #ifdef SOCKET_STDOUT_REPORTING
             SOCKET_REPORTING("New user connected\n");
         #endif
         me->connectionID = y;
-        me->socketServer->threadStorage[y] = (thread_t*) malloc(sizeof(thread_t));
         if(me->socketServer->listener == nullptr){
+            throwNetAttr *thr = (throwNetAttr*)malloc(sizeof(throwNetAttr));
+            *thr = throwNetAttr(me, me->connectionID);
             #ifdef USE_PTHREAD
              pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->listener, new throwNetAttr(me, me->connectionID));
              pthread_detach(*me->socketServer->threadStorage[y]);
             #else
-             *me->socketServer->threadStorage[y] = CreateThread(NULL, 0, me->listener, new throwNetAttr(me, me->connectionID), 0, NULL);
+             me->socketServer->connection[y].thread = CreateThread(NULL, 0, me->listener, thr, 0, NULL);
             #endif
             // printf("Func");
         }else{
-            // if(me->socketServer->listener->)
+            throwNetAttr *thr = (throwNetAttr*)malloc(sizeof(throwNetAttr));
+            *thr = throwNetAttr(me, me->connectionID);
             #ifdef USE_PTHREAD
             pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->socketServer->listener->Upthreadable, new throwNetAttr(me, me->connectionID, me->socketServer->listener));
             pthread_detach(*me->socketServer->threadStorage[y]);
             #else
-             *me->socketServer->threadStorage[y] = CreateThread(NULL, 0, me->listener, new throwNetAttr(me, me->connectionID), 0, NULL);
+             me->socketServer->connection[y].thread = CreateThread(NULL, 0, me->listener, thr, 0, NULL);
             #endif
             y++;
-            me->socketServer->connection[y] = new int(0);
-            me->socketServer->threadStorage[y] = (thread_t*)malloc(sizeof(thread_t));
+            if(me->socketServer->connection.full() < 100) 
+                y = me->socketServer->connection.insert(0, 0);
+            else y = me->socketServer->connection.append(0, 0);
             #ifdef USE_PTHREAD
              pthread_create(me->socketServer->threadStorage[y], &me->socketServer->attr, me->socketServer->listener->Downthreadable, new throwNetAttr(me, me->connectionID, me->socketServer->listener));
              pthread_detach(*me->socketServer->threadStorage[y]);
             #else
-             *me->socketServer->threadStorage[y] = CreateThread(NULL, 0, me->listener, new throwNetAttr(me, me->connectionID), 0, NULL);
+             me->socketServer->connection[y].thread = CreateThread(NULL, 0, me->listener, new throwNetAttr(me, me->connectionID), 0, NULL);
             #endif
         }
         me->socketServer->cc++;
@@ -257,6 +307,7 @@ void SocketServer::start(NetworkListener *listener, int maxClients){
 }
 
 /** socket Client interface **/
+
 SocketClient::SocketClient(){
     Socket();
 }
@@ -275,13 +326,12 @@ int SocketClient::connect(std::string addr, int port, int protocol){
     if (connectLS(fd, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR)
         SocketException((char*)addr.c_str(), "Failed to connect to server: Host not resolved\
  or already in use. Failing in connection stage.", nullptr, port, -2).call();
-    connection[0] = &fd;
+    connection[0].conn = fd;
     cc++;
     return(address.sin_port);
 }
 
 /*** NetworkListener interface **/
-
 
 void NetworkListener::setListener(int type, void (*listener)(void *attr)){
     if(type == DEFAULT_LISTENER)
@@ -295,7 +345,7 @@ void NetworkListener::setListener(int type, void (*listener)(void *attr)){
 
 std::string ___SockPTR___uniQED__::read(){
     char *tmp = new char[*this->bitrade];
-    readLS(*conn[*cc-1], tmp, *this->bitrade);
+    readLS(conn[*cc-1].conn, tmp, *this->bitrade);
     if(tmp == NULL) SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
 becouse it's (or buffer) is NULL", (char*)"called from ___SockPTR::read() May be all sock-ptr struct was delted.", 71, -1).call();
     free(tmp);
@@ -304,7 +354,8 @@ becouse it's (or buffer) is NULL", (char*)"called from ___SockPTR::read() May be
 }
 std::string ___SockPTR___uniQED__::read(int conn){
     char *tmp = new char[*this->bitrade];
-    int sub = readLS(*this->conn[conn], tmp, *this->bitrade);
+    int sub = readLS(this->conn[conn].conn, tmp, *this->bitrade);
+    #ifndef __WIN32
     if(sub == 0){
         SocketException("localhost", "Connection closed from other side", (char*)"discon, reading trial.", 60012, 0x71).call();
         //connection closerd
@@ -312,6 +363,12 @@ std::string ___SockPTR___uniQED__::read(int conn){
         SocketException("localhost", "Connection is exsistn't or busy", (char*)"notfound, reading trial.", 60012, 0x72).call();
         //connection already destroyed
     }
+    #else
+        if(sub != SOCKET_ERROR){
+            int lastCode = WSAGetLastError();
+            SocketException("localhost", WSAToStr(ExceptionCodeFromWSA(lastCode)), "called from read func.", 60012, ExceptionCodeFromWSA(lastCode)).call();
+        }
+    #endif
     if(tmp == nullptr) SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
 becouse it's (or buffer) is NULL", (char*)"called from ___SockPTR::read(int conn). May be all sock-ptr struct was delted.", 71, -1).call();
     std::string str = tmp;
@@ -319,10 +376,10 @@ becouse it's (or buffer) is NULL", (char*)"called from ___SockPTR::read(int conn
     return str;
 }
 int ___SockPTR___uniQED__::send(std::string data){
-    return sendLS(*conn[*cc-1], data.c_str(), *this->bitrade, 0);
+    return sendLS(conn[*cc-1].conn, data.c_str(), *this->bitrade, 0);
 }
 int ___SockPTR___uniQED__::send(std::string data, int conn){
-    return sendLS(*this->conn[conn], data.c_str(), *this->bitrade, 0);
+    return sendLS(this->conn[conn].conn, data.c_str(), *this->bitrade, 0);
 }
 char *___SockPTR___uniQED__::setBuffer(char *buffer){
     this->buffer = buffer;
@@ -336,14 +393,14 @@ ___SockPTR___uniQED__::___SockPTR___uniQED__(void *ptr, bool isServer){
     if(isServer){
         SocketServer *server = (SocketServer*)(ptr);
         this->fd = &server->fd;
-        this->conn = server->connection;
+        // this->conn = server->connection;
         this->buffer = server->buffer;
         this->bitrade = &server->bitrade;
         this->cc = &server->cc;
     }else{
         SocketClient *client = (SocketClient*)(ptr);
         this->fd = &client->fd;
-        this->conn = client->connection;
+        this->conn = &client->connection;
         this->buffer = client->buffer;
         this->bitrade = &client->bitrade;
         this->cc = &client->cc;
@@ -419,13 +476,20 @@ std::string ListenerStream<mutualType>::read(){
 template <typename mutualType>
 void ListenerStream<mutualType>::send(std::string data){
     int sub = this->attributes->ptsd->sockPtr->send(data, this->attributes->connID);
+    #ifndef __WIN32
     if(sub == 0){
-        SocketException("localhost", "Connection closed from other side", (char*)"discon, sending trial", 60012, 0x71).call();
+        SocketException("localhost", "Connection closed from other side", (char*)"discon, sending trial", 60012, SOCKEXC_DISCONN).call();
         //connection closerd
     }else if(sub < 0){
-        SocketException("localhost", "Connection is exsistn't or busy", (char*)"notfound, sending trial", 60012, 0x72).call();
+        SocketException("localhost", "Connection is exsistn't or busy", (char*)"notfound, sending trial", 60012, SOCKEXC_BROKENP).call();
         //connection already destroyed
     }
+    #else
+    if(sub != SOCKET_ERROR){
+        int lastCode = WSAGetLastError();
+        SocketException("localhost", WSAToStr(ExceptionCodeFromWSA(lastCode)), "called from read func.", 60012, ExceptionCodeFromWSA(lastCode)).call();
+    }
+    #endif
 }
 template <typename mutualType>
 ListenerStream<mutualType>::ListenerStream(void *arg){
@@ -439,28 +503,73 @@ template <typename mutualType>
 void ListenerStream<mutualType>::close(){
     (*(this->attributes->ptsd->sockPtr->cc))--;
     // sideTo(this->attributes->ptsd->sockPtr->conn, this->attributes->connID, *(this->attributes->ptsd->sockPtr->cc)+2);
-    delete(this->attributes->ptsd->sockPtr->conn[this->getCurrent()]);
-    delete(this->attributes->ptsd->socketServer->threadStorage[this->getCurrent()]);
-    this->attributes->ptsd->socketServer->threadStorage[this->getCurrent()] = NULL;
-    this->attributes->ptsd->sockPtr->conn[this->getCurrent()] = NULL;
+    // delete(this->attributes->ptsd->sockPtr->conn[this->getCurrent()]);
+    // delete(this->attributes->ptsd->socketServer->threadStorage[this->getCurrent()]);
+    // this->attributes->ptsd->socketServer->connection.thread[this->getCurrent()] = 0x0;
+    closesocket(this->attributes->ptsd->sockPtr->conn[this->getCurrent()].conn);
+    this->attributes->ptsd->sockPtr->conn[this->getCurrent()].remove();
 }
 template <typename mutualType>
 int ListenerStream<mutualType>::getCurrent(){
     return this->attributes->connID;
 }
 int SocketClient::read(){
-    int sub = readLS(*connection[cc-1], buffer, this->bitrade);
-    if(buffer == NULL) SocketException((char*)"Current serverd", (char*)"Failed to read incoming data, \
+    int sub = readLS(this->connection[cc-1].conn, buffer, this->bitrade);
+    if(buffer == NULL) SocketException((char*)"localhost", (char*)"Failed to read incoming data, \
 becouse it's is NULL", nullptr, 71, -1).call();
+    #ifndef __WIN32
     if(sub == 0){
-        SocketException("localhost", "Connection closed from other side", (char*)"discon", 60012, 0x71).call();
+        SocketException("localhost", "Connection closed from other side", (char*)"discon", 60012, SOCKEXC_DISCONN).call();
         //connection closerd
     }else if(sub < 0){
-        SocketException("localhost", "Connection is exsistn't or busy", (char*)"notfound", 60012, 0x72).call();
+        SocketException("localhost", "Connection is exsistn't or busy", (char*)"notfound", 60012, SOCKEXC_BROKENP).call();
         //connection already destroyed
     }
+    #else
+
+    #endif
     return sub;
 }
 bool NetworkListener::isMonolite(){
     return this->listeners.defaultListener != NULL;
+}
+int ConnectionList::full(){
+    int  y = 0;
+    for(int i = 0; i <= this->length(); i++)
+        if(this->operator[](i).conn == -1) y++;
+    return y;
+}
+int ConnectionList::length(){
+    if(next == NULL) return 0;
+    else return next->length()+1;
+}
+ConnectionList& ConnectionList::operator[](int index){
+    if(index == 0) return *this;
+    else return this->next->operator[](index-1);
+}
+int ConnectionList::append(socket_t fd, thread_t thread){
+    if(next == NULL){
+        next = new ConnectionList(fd, thread);
+        return 0;
+    }else return next->append(fd, thread)+1;
+}
+ConnectionList::ConnectionList(socket_t fd, thread_t thread){
+    this->conn = fd;
+    this->thread = thread;
+    this->next = NULL;
+}
+int ConnectionList::remove(){
+    this->conn = -1;
+    this->thread = 0x0;
+    return -1;
+}
+int ConnectionList::insert(socket_t fd, thread_t thread){
+    if(!this->full()) return this->append(fd, thread);
+    else{
+        int i = 0;
+        for(; this->operator[](i).conn != -1; i++);
+        this->operator[](i).conn = fd;
+        this->operator[](i).thread = thread;
+        return i;
+    }
 }

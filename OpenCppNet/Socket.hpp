@@ -60,25 +60,57 @@
 // 3X - Any side, Iternel errors (architecture fail)
 // 4X - Any side, Called from outside
 // 5X - Any side, Preparing stage fail
+// 6X - Any side, Hardware or OS error
 // 7X - Any side, while connection is active
 // 8X - Server fail
 // 9X - Client fail
 // Additional codes:
 // 
-#define SOCKEXC_DISCONN         0x70 //Connection refused: closed from other side
-#define SOCKEXC_BROKENP         0x71 //Connection refused: closed or broken
-#define SOCKEXC_TIMEOUT         0x72 //Connection refused: time out
-#define SOCKEXC_ALINUSE         0x80 //Failed to bind server: already in use
-#define SOCKEXC_ARCHUNS         0x50 //OS arch is unsupported
-#define SOCKEXC_UNCERTL         0x20 //Wrong listener list: one or more listeners is conflicting
-#define SOCKEXC_ITERNAL         0x30 //Iternal error excite exception. in additional info taken struct with all info
-#define SOCKEXC_ARCHERR         0x31 //OS unique error
-#define SOCKEXC_RESOLVE         0x91 //Connection denied: host not found or not resolved
-#define SOCKEXC_NOFILED         0x32 //No file description for socket
-//Listeners return codes
+#define SOCKEXC_DISCONN         0x70 //Connection refused: closed from other side.
+#define SOCKEXC_BROKENP         0x71 //Connection refused: closed or broken.
+#define SOCKEXC_TIMEOUT         0x72 //Connection refused: time out.
+#define SOCKEXC_ALINUSE         0x80 //Failed to bind server: already in use.
+#define SOCKEXC_ARCHUNS         0x50 //OS arch is unsupported.
+#define SOCKEXC_UNCERTL         0x20 //Wrong listener list: one or more listeners is conflicting.
+#define SOCKEXC_ITERNAL         0x30 //Iternal error excite exception. in additional info taken struct with all info.
+#define SOCKEXC_ARCHERR         0x31 //OS unique error.
+#define SOCKEXC_RESOLVE         0x91 //Connection denied: host not found or not resolved.
+#define SOCKEXC_NOFILED         0x32 //No file description for socket.
+#define SOCKEXC_INVHAND         0x33 //WSA_INVALID_HANDLE.
+#define SOCKEXC_NOENMEM         0x60 //Not enough memory.
+#define SOCKEXC_OSINPAR         0x34 //Invalid parameter from socket opt.
+#define SOCKEXC_ABORTED         0x61 //Operation aborted.
+#define SOCKEXC_IOINCOM         0x62 //Overlapped I/O event object not in signaled state.
+#define SOCKEXC_WSAIOIN         0x63 //Overlapped operations will complete later. 
+#define SOCKEXC_WSAINTR         0x64 //Interrupted function call from WSA manager.
+#define SOCKEXC_WSAEACC         0x65 //WSA Permission denied.
+#define SOCKEXC_WSAEBAD         0x66 //File handle is not valid.
+#define SOCKEXC_TOOMANY         0x67 //Too many open sockets.
+#define SOCKEXC_NOENBUF         0x32 //No buffer.
+
 #define endStream(x)        return(LAMBDA_THREAD_END(x))// type endStream(exit code); for break listener's loop
 #define thread_routine_t    LAMBDA_THREAD_END           // type of poiner to function for thread
 #define thread_t            THREADING_ARCH              // type of thread
+#define socket_t            int                         // type of socket file description
+
+class ConnectionList{
+    protected:
+        ConnectionList *next;
+    public:
+        ConnectionList(socket_t fd=-1, thread_t thread=0x0);
+
+        socket_t conn;
+        thread_t thread;
+
+        ConnectionList& operator[](int index);
+
+        int append(socket_t conn, thread_t thread);
+        int insert(socket_t conn, thread_t thread);
+        int remove();
+        int length();
+
+        int full();
+};
 
 class Socket{
     public:
@@ -92,7 +124,7 @@ class Socket{
         int bitrade;
         struct sockaddr_in address; 
         int fd, cc;
-        std::vector <int*> connection;
+        ConnectionList connection;
         char opt;
         size_t al = sizeof(address);
         /** Communicate with connection **/
@@ -113,7 +145,7 @@ class ___SockPTR___uniQED__{
     public:
         ___SockPTR___uniQED__(void *client, bool isServer);
         int *fd;
-        std::vector <int*> conn;
+        ConnectionList *conn;
         int *cc;
         int *bitrade;
         char *buffer;
@@ -140,6 +172,10 @@ class SocketException{
 
         void print(); //default print if exception occupted
         void call(); //same as print() but stop programm after finish
+
+        #ifdef __WIN32
+        void buildFromWSA(int err);
+        #endif
 };
 
 SocketException SockTimeOut("", "Time for connection is out.", "", 0, SOCKEXC_TIMEOUT);
@@ -165,7 +201,6 @@ class SocketServer : public Socket{
         void start(NetworkListener *listener, int maxClients);
         struct throwenSocketServerStruct arg;
         static thread_routine_t listen(void *arg);
-        std::vector <thread_t *> threadStorage;
         thread_t mainThread;
         #ifdef USE_PTHREAD
          pthread_attr_t attr;
