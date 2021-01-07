@@ -6,7 +6,6 @@
  #pragma comment(lib, "ws2_32.lib")
  #include <winsock.h>
  #include <ws2tcpip.h>
- #include <ws2tcpip.h>
 #else
  #include <sys/types.h>
  #include <sys/socket.h> 
@@ -15,6 +14,7 @@
  #include <net/if.h>
 #endif
 #ifdef __WIN32
+ #define NET_ARCH SOCKET
  #ifndef USE_PTHREAD
   #include <windows.h>
  #else
@@ -26,6 +26,7 @@
   #endif
  #endif
 #else
+ #define NET_ARCH int
  #define USE_PTHREAD
  #include <pthread.h>
 #endif
@@ -55,43 +56,65 @@
 #define UPLOADS_LISTENER        0x01 //First  Network Thread
 #define DOWNLOAD_LISTENER       0x02 //Second Network Thread
 //Exception codes
-// 1X - Any side, runtime error or warning (user's algorithm call some exceptions)
-// 2X - Any side, settings or using error
-// 3X - Any side, Iternel errors (architecture fail)
-// 4X - Any side, Called from outside
-// 5X - Any side, Preparing stage fail
-// 6X - Any side, Hardware or OS error
-// 7X - Any side, while connection is active
+// 1X - Any side, runtime error or warning (user's algorithm call some exceptions)          runtime
+// 2X - Any side, settings or using error                                                   Human error
+// 3X - Any side, Iternel errors (architecture fail)                                        arch error
+// 4X - Any side, Called from outside                                                       OS-called
+// 5X - Any side, Preparing stage fail                                                      human error, setup error
+// 6X - Any side, Hardware or OS error                                                      OS error (or hard)
+// 7X - Any side, while connection is active                                                runtime
 // 8X - Server fail
 // 9X - Client fail
 // Additional codes:
-// 
-#define SOCKEXC_DISCONN         0x70 //Connection refused: closed from other side.
-#define SOCKEXC_BROKENP         0x71 //Connection refused: closed or broken.
-#define SOCKEXC_TIMEOUT         0x72 //Connection refused: time out.
-#define SOCKEXC_ALINUSE         0x80 //Failed to bind server: already in use.
-#define SOCKEXC_ARCHUNS         0x50 //OS arch is unsupported.
-#define SOCKEXC_UNCERTL         0x20 //Wrong listener list: one or more listeners is conflicting.
-#define SOCKEXC_ITERNAL         0x30 //Iternal error excite exception. in additional info taken struct with all info.
-#define SOCKEXC_ARCHERR         0x31 //OS unique error.
-#define SOCKEXC_RESOLVE         0x91 //Connection denied: host not found or not resolved.
-#define SOCKEXC_NOFILED         0x32 //No file description for socket.
-#define SOCKEXC_INVHAND         0x33 //WSA_INVALID_HANDLE.
-#define SOCKEXC_NOENMEM         0x60 //Not enough memory.
-#define SOCKEXC_OSINPAR         0x34 //Invalid parameter from socket opt.
-#define SOCKEXC_ABORTED         0x61 //Operation aborted.
-#define SOCKEXC_IOINCOM         0x62 //Overlapped I/O event object not in signaled state.
-#define SOCKEXC_WSAIOIN         0x63 //Overlapped operations will complete later. 
-#define SOCKEXC_WSAINTR         0x64 //Interrupted function call from WSA manager.
-#define SOCKEXC_WSAEACC         0x65 //WSA Permission denied.
-#define SOCKEXC_WSAEBAD         0x66 //File handle is not valid.
-#define SOCKEXC_TOOMANY         0x67 //Too many open sockets.
-#define SOCKEXC_NOENBUF         0x32 //No buffer.
+                    //Connection refused: closed from other side.
+                    #define SOCKEXC_DISCONN         0x70
+                    //Connection refused: closed or broken.
+                    #define SOCKEXC_BROKENP         0x71
+                    //Connection refused: time out.
+                    #define SOCKEXC_TIMEOUT         0x72
+                    //Failed to bind server: already in use.
+                    #define SOCKEXC_ALINUSE         0x80
+                    //OS arch is unsupported.
+                    #define SOCKEXC_ARCHUNS         0x50
+                    //Wrong listener list: one or more listeners is conflicting.
+                    #define SOCKEXC_UNCERTL         0x20
+                    //NULL using as buffer
+                    #define SOCKEXC_NULLBUF         0x21
+                    //Iternal error excite exception. in additional info taken struct with all info.
+                    #define SOCKEXC_ITERNAL         0x30
+                    //OS unique error.
+                    #define SOCKEXC_ARCHERR         0x31
+                    //Connection denied: host not found or not resolved.
+                    #define SOCKEXC_RESOLVE         0x91
+                    //No file description for socket.
+                    #define SOCKEXC_NOFILED         0x32
+                    //WSA_INVALID_HANDLE.
+                    #define SOCKEXC_INVHAND         0x33
+                    //Not enough memory.
+                    #define SOCKEXC_NOENMEM         0x60
+                    //Invalid parameter from socket opt.
+                    #define SOCKEXC_OSINPAR         0x34
+                    //Operation aborted.
+                    #define SOCKEXC_ABORTED         0x61
+                    //Overlapped I/O event object not in signaled state.
+                    #define SOCKEXC_IOINCOM         0x62
+                    //Overlapped operations will complete later. 
+                    #define SOCKEXC_WSAIOIN         0x63
+                    //Interrupted function call from WSA manager.
+                    #define SOCKEXC_WSAINTR         0x64
+                    //WSA Permission denied.
+                    #define SOCKEXC_WSAEACC         0x65
+                    //File handle is not valid.
+                    #define SOCKEXC_WSAEBAD         0x66
+                    //Too many open sockets.
+                    #define SOCKEXC_TOOMANY         0x67
+                    //No buffer.
+                    #define SOCKEXC_NOENBUF         0x32
 
 #define endStream(x)        return(LAMBDA_THREAD_END(x))// type endStream(exit code); for break listener's loop
 #define thread_routine_t    LAMBDA_THREAD_END           // type of poiner to function for thread
 #define thread_t            THREADING_ARCH              // type of thread
-#define socket_t            int                         // type of socket file description
+#define socket_t            NET_ARCH                    // type of socket file description
 
 class ConnectionList{
     protected:
@@ -121,9 +144,10 @@ class Socket{
         /** Comment this later **/
         Socket();
         char *buffer;
-        int bitrade;
+        int bitrate;
         struct sockaddr_in address; 
-        int fd, cc;
+        socket_t fd;
+        int cc;
         ConnectionList connection;
         char opt;
         size_t al = sizeof(address);
@@ -137,17 +161,17 @@ class Socket{
         int close(int conn);
         int addConnection();
         int setActive(int conn);
-        int setBitrade(int bitrade);
+        int setBitrate(int bitrate);
         char *setBuffer(char *buffer);
 };
 
 class ___SockPTR___uniQED__{
     public:
         ___SockPTR___uniQED__(void *client, bool isServer);
-        int *fd;
+        socket_t *fd;
         ConnectionList *conn;
         int *cc;
-        int *bitrade;
+        int *bitrate;
         char *buffer;
         /** Communicate with connection **/
         std::string read();
@@ -157,7 +181,7 @@ class ___SockPTR___uniQED__{
         /** Connection managment; **/
         int kill(int conn);
         int close(int conn);
-        int setBitrade(int bitrade);
+        int setBitrate(int bitrate);
         char *setBuffer(char *buffer);
         int connn;
 };
@@ -242,7 +266,6 @@ class SocketClient : public Socket{
     public:
         SocketClient();
         int connect(std::string addr, int port, int protocol = SOCK_STREAM);
-        int read();
 };
 
 class throwNetAttr{

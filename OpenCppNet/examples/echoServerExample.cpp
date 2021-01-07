@@ -30,7 +30,7 @@ int main(){
         std::cout<<e.description<<"\n\tAddress:"<<e.address<<"\n\tPort:"<<e.port<<"\n\tAdditional info:"<<int(*e.additional)<<"\n\tCode of error:"<<e.codeOfError; //if exception happen, it's display all info
     }
     try{ //try to start server
-        std::cout<<server.setBitrade(1024)<<std::endl; //set a bitrade, print current bitrade (shoud be 1024)
+        std::cout<<server.setBitrate(1024)<<std::endl; //set a bitrade, print current bitrade (shoud be 1024)
         server.setBuffer(readingBuffer); //setting buffer
         server.bind("127.0.0.1", 8000); //binding server in local host and 8000 port
         server.start(&listener, 5); //start listening for clients. MAx. count of clients: 5
