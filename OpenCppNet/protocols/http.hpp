@@ -1,5 +1,8 @@
 //default paths
 //потом сменю на более качественные настройки
+
+#pragma once
+
 #define HTTP_ERR_SZ 2048
 #define HTTP_404_FN "404.html"
 #define HTTP_404_EX(file) SocketException("localhost:server","Error file not found", (char*)file, int(HTTP_LIB), int((0x01a<<4)&404))
@@ -8,9 +11,12 @@
 #define HTTP_IRF_EX(additional) SocketException("localhost:invalid request", additional, NULL, int(HTTP_LIB), int((0x01a<<4)&51))
 #define HTTP_500_FN "$none"
 
-#pragma once
 #include <string.h>
 #include <stdio.h>
+
+#include <stdlib.h>
+#include <stdio.h>
+
 #ifndef SCFD
     class SocketException{
         public:

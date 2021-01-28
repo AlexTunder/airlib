@@ -158,6 +158,7 @@ void SocketException::call(){
 Socket::Socket(){
     #ifdef __WIN32
     this->fd = INVALID_SOCKET;
+    ZeroMemory( &hints, sizeof(hints) );
     if(WSAStartup(MAKEWORD(2,2), &this->wsa) != 0)
         SocketException("Operating system arch", "Failed to setup WSA data", (char*)&this->wsa, SOCKEXC_ARCHERR, SOCKEXC_ARCHERR).call();
     #endif
@@ -203,6 +204,10 @@ int Socket::kill(int conn){
 
 SocketServer::SocketServer(){
     Socket();
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_flags = AI_PASSIVE;
     #ifndef __WIN32
      this->threadStorage = new pthread_t*;
     pthread_mutexattr_init(&this->mutexattr);
@@ -224,24 +229,35 @@ SocketServer::SocketServer(){
 int SocketServer::bind(std::string addr, int port, int protocol, long additionalFlags){
     this->buffer = new char[this->bitrate];
     this->me = addr;    this->port = port;
-    fd = socket(AF_INET, protocol, IPPROTO_TCP);
     #ifndef __WIN32
+     fd = socket(AF_INET, protocol, IPPROTO_TCP);
      setsockopt(fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
     #else
-     setsockopt(fd, SOL_SOCKET, additionalFlags, &opt, sizeof(opt));
+     char sport[16];
+     sprintf(sport, "%i", port);
+     if(getaddrinfo(NULL, sport, &hints, &result) == 0){
+        fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+        setsockopt(fd, SOL_SOCKET, additionalFlags, &opt, sizeof(opt));
+     }else throw SocketException(addr.c_str(), "Cannot resolve hostname", NULL, port, SOCKEXC_RESOLVE, 0x0);
     #endif
     
-    address.sin_family = AF_INET; 
-    address.sin_addr.s_addr = INADDR_ANY; 
-    address.sin_port = htons(port); 
+    #ifndef __WIN32
+        address.sin_family = AF_INET; 
+        address.sin_addr.s_addr = INADDR_ANY; 
+        address.sin_port = htons(port); 
+    #endif
     // this->arg.sockPtr = new ___SockPTR___uniQED__(this, 1);
     char exitCode = 0;
     #ifdef __WIN32
-    if((exitCode = SSLLBC(fd, (struct sockaddr *)&address, sizeof(address)))==SOCKET_ERROR){
+    if((exitCode = SSLLBC(fd, result->ai_addr, (int)result->ai_addrlen))==SOCKET_ERROR){
         exitCode = WSAGetLastError();
+        freeaddrinfo(result);
+        closesocket(fd);
+        WSACleanup();
         SocketException((char*)addr.c_str(), (char*)"Failed to bind server: Host not resolved\
  or already in use.", (char*)char(exitCode), port, -2).call();
     }
+    freeaddrinfo(result);
     #else
     if((exitCode = SSLLBC(fd, (struct sockaddr *)&address, sizeof(address))))
         SocketException((char*)addr.c_str(), (char*)"Failed to bind server: Host not resolved\
@@ -279,25 +295,24 @@ thread_routine_t SocketServer::listen(void *arg){
 
         int y = 0;
 
-        if(!me->socketServer->connection.full()) 
+        if(!me->socketServer->connection.full())
             y = me->socketServer->connection.insert(0, 0);
         else y = me->socketServer->connection.append(0, 0);
 
         #ifndef __WIN32
-        if (errcode = listenLS(me->socketServer->fd, 3) < 0)
+         if (errcode = listenLS(me->socketServer->fd, 3) < 0)
         #else
-        if (errcode = listenLS(me->socketServer->fd, 3) == SOCKET_ERROR)
+        if (errcode = listenLS(me->socketServer->fd, SOMAXCONN) == SOCKET_ERROR)
         #endif
             SocketException((char*)me->socketServer->me.c_str(), "Failed for listening deamon.", (char*)"(ListenLS)See additionalErrorCode for more info",\
             me->socketServer->port, SOCKEXC_ITERNAL, errcode).call();
         sleep(1);
         #ifndef __WIN32
-        if ((me->socketServer->connection[y] = new int(accept(me->socketServer->fd, (struct sockaddr *)&me->socketServer->address,  
+         if ((me->socketServer->connection[y] = new int(accept(me->socketServer->fd, (struct sockaddr *)&me->socketServer->address,  
                         (int*)&me->socketServer->al)))<0)
         #else
-        int sub = accept(me->socketServer->fd, (struct sockaddr *)&me->socketServer->address, (int*)&me->socketServer->al);
-        if ((me->socketServer->connection[y].conn = accept(me->socketServer->fd, (struct sockaddr *)&me->socketServer->address,  
-                        (int*)&me->socketServer->al)) != 0 && sub == INVALID_SOCKET)
+         int sub = accept(me->socketServer->fd, 0x0, 0x0);
+         if(sub == INVALID_SOCKET)
         #endif
             SocketException((char*)me->socketServer->me.c_str(), "Failed for listening deamon.", (char*)"accept fail", me->socketServer->port, SOCKEXC_ITERNAL, errcode).call();
         #ifdef SOCKET_STDOUT_REPORTING
@@ -398,6 +413,9 @@ void SocketServer::start(NetworkListener *listener, int maxClients){
 
 SocketClient::SocketClient(){
     Socket();
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
 }
 /*
 *

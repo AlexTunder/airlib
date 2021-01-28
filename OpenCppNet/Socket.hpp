@@ -140,6 +140,7 @@ class Socket{
         //NT-only declire
         #ifdef __WIN32
          WSADATA wsa;
+         struct addrinfo *result = NULL, *ptr = NULL, hints;
         #endif
         /** Comment this later **/
         Socket();
